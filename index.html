@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>倚声 · AI填词工坊</title>
+    <meta name="description" content="输入一段意境，选一个词牌，得一首合律的词。附填词教程、名作赏析与格律知识。" />
+    <meta name="theme-color" content="#F5F0E8" />
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='78' font-size='78'%3E%F0%9F%8F%AE%3C/text%3E%3C/svg%3E" />
+    <!-- 社交分享默认值；文章页会由 src/utils/seo.js 改写成该篇自己的信息 -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="倚声 · AI填词工坊" />
+    <meta property="og:title" content="倚声 · AI填词工坊" />
+    <meta property="og:description" content="输入一段意境，选一个词牌，得一首合律的词。" />
+    <meta property="og:image" content="/og-default.svg" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <!--
+      字体说明：本应用不引入外部字体文件（中文字体动辄十几 MB，且外部 CDN 未必可达），
+      改用系统字体栈——Windows 上的「楷体 / 宋体」、macOS 上的「Kaiti SC / Songti SC」都能直接命中。
+      若想换用「霞鹜文楷 / 思源宋体」，见 README「换字体」一节。
+    -->
+    <script>
+      // 首屏防闪白：在挂载前就把主题定下来
+      try {
+        var t = localStorage.getItem('ys_theme') || 'light'
+        document.documentElement.setAttribute('data-theme', t)
+      } catch (e) {
+        document.documentElement.setAttribute('data-theme', 'light')
+      }
+    </script>
+  </head>
+  <body>
+    <div id="app"></div>
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>

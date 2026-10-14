@@ -1,0 +1,21 @@
+# 本地密钥（复制成 .dev.vars 后填写；该文件已被 .gitignore 排除）
+#
+# Cloudflare 的 `wrangler pages dev` 会自动读取本文件；
+# 本项目的自建开发服务器（server/dev-server.mjs）也从环境变量读同样的名字，
+# 所以本地直接 export 这些变量、或用 .dev.vars 都能跑。
+#
+# 线上不要用这份文件：改用
+#   npx wrangler pages secret put SITE_SECRET
+#   npx wrangler pages secret put AI_API_KEY
+
+# 令牌签名密钥。**必须改成自己的随机串，长度 ≥ 16**，
+# 否则会退化到代码里的开发默认值（那样任何人都能伪造管理员令牌）。
+SITE_SECRET=请换成一串你自己的随机字符_至少16位
+
+# AI 接口。留空则只用内置词库引擎（功能完整，不联网、零成本）。
+# 填了之后 /generate 会优先调用大模型，失败或超时自动回落本地引擎。
+AI_API_KEY=
+AI_BASE_URL=https://api.deepseek.com/v1
+AI_MODEL=deepseek-chat
+# 推理型模型（如部分通义/魔搭模型）会输出 think 段，必须关掉才能拿到干净的词句
+AI_DISABLE_THINKING=1

@@ -1,0 +1,89 @@
+/* ═══════════════════════════════════════════════════════════════
+   设计令牌 —— 宋式美学 · 文人雅韵
+   古纸为底、墨色为字、朱砂为记、石青为引、藤黄为点。
+   深浅两套完全对应，切换时只换令牌，不换结构。
+   ═══════════════════════════════════════════════════════════════ */
+
+:root {
+  /* ── 底色体系 ── */
+  --paper: #f5f0e8;        /* 主背景：仿宋刻本纸 */
+  --paper-2: #faf8f3;      /* 卡片 / 面板：略白 */
+  --paper-3: #efe8dc;      /* 次级面板 / 输入框底 */
+  --paper-inset: #e9e1d3;  /* 内凹块（代码、引用） */
+
+  /* ── 墨色体系 ── */
+  --ink: #2c2416;          /* 主文字：墨灰 */
+  --ink-2: #6b5e4a;        /* 次要文字：淡墨 */
+  --ink-3: #9a8c74;        /* 更淡：提示、占位 */
+  --ink-4: #b8ac97;        /* 最淡：disabled */
+
+  /* ── 五色 ── */
+  --cinnabar: #c43d3d;     /* 朱砂：韵脚、重点、危险 */
+  --cinnabar-soft: #e8c4c4;
+  --azurite: #4a6b8a;      /* 石青：链接、词牌标签 */
+  --azurite-soft: #ccd9e5;
+  --gamboge: #d4a853;      /* 藤黄：高亮、收藏 */
+  --gamboge-soft: #f0e2c2;
+  --moss: #5f7a5a;         /* 苔绿：成功状态 */
+
+  /* ── 线条 ── */
+  --line: #e5ddd0;
+  --line-strong: #d4c9b6;
+
+  /* ── 阴影（极轻，仿纸面起伏） ── */
+  --shadow-1: 0 1px 2px rgba(44, 36, 22, 0.05);
+  --shadow-2: 0 2px 10px rgba(44, 36, 22, 0.07);
+  --shadow-3: 0 10px 32px rgba(44, 36, 22, 0.12);
+
+  /* ── 纸张噪点（内联 SVG，不额外请求） ── */
+  --noise: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)' opacity='0.035'/%3E%3C/svg%3E");
+
+  /* ── 字体 ── */
+  --font-serif: "Source Han Serif SC", "Noto Serif CJK SC", "Songti SC", "SimSun", "STSong", Georgia, serif;
+  --font-kai: "LXGW WenKai", "Kaiti SC", "KaiTi", "楷体", "STKaiti", "Kaiti SC", serif;
+  --font-sans: system-ui, -apple-system, "Segoe UI", "Microsoft YaHei", "PingFang SC", sans-serif;
+  --font-mono: "JetBrains Mono", "Cascadia Mono", Consolas, "SFMono-Regular", monospace;
+
+  /* ── 形态 ── */
+  --r: 4px;                /* 微圆角：仿刻本 */
+  --r-lg: 8px;
+  --r-pill: 999px;
+  --maxw: 1180px;
+
+  /* ── 动效 ── */
+  --ease-ink: cubic-bezier(0.22, 0.61, 0.36, 1);
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --t-fast: 150ms;
+  --t: 260ms;
+  --t-slow: 420ms;
+  --t-theme: 800ms;        /* 暗色切换：如吹熄烛火 */
+}
+
+[data-theme='dark'] {
+  --paper: #1e2022;        /* 青灰底：模拟夜读青灯 */
+  --paper-2: #262a2d;
+  --paper-3: #2c3135;
+  --paper-inset: #171a1c;
+
+  --ink: #ece6da;
+  --ink-2: #a9a192;
+  --ink-3: #837c6e;
+  --ink-4: #5f5a50;
+
+  --cinnabar: #d9584f;
+  --cinnabar-soft: #4a2b2a;
+  --azurite: #7fa3c4;
+  --azurite-soft: #2a3944;
+  --gamboge: #d9b36a;
+  --gamboge-soft: #3d3423;
+  --moss: #7fa077;
+
+  --line: #343a3e;
+  --line-strong: #434a4f;
+
+  --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --shadow-2: 0 2px 10px rgba(0, 0, 0, 0.35);
+  --shadow-3: 0 10px 32px rgba(0, 0, 0, 0.5);
+
+  --noise: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)' opacity='0.05'/%3E%3C/svg%3E");
+}

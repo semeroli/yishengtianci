@@ -1,0 +1,40 @@
+# 倚声 · AI填词工坊 —— Cloudflare Pages 部署配置
+# ─────────────────────────────────────────────────────────────
+# 这个文件是**绑定关系**的唯一配置源：D1 / KV / R2 都写在这里，
+# 而不是在控制台里点。理由：控制台里的绑定是"看不见的历史"，
+# 换个人接手就不知道线上到底连了哪个库。
+#
+# 注意：密钥（SITE_SECRET / AI_API_KEY）不要写进本文件，
+#       用 `wrangler pages secret put` 上传，或写进 .dev.vars（已被 .gitignore 排除）。
+
+name = "yisheng"
+pages_build_output_dir = "dist"
+compatibility_date = "2024-11-01"
+
+# node:sqlite 是本地替身用的；线上用的是真 D1。
+# AI 接口按需打开下行的 nodejs_compat（部分 SDK 需要）。
+compatibility_flags = ["nodejs_compat"]
+
+# ── D1：文章、评论、收藏、设置、填词记录 ────────────────────
+[[d1_databases]]
+binding = "DB"
+database_name = "yisheng-db"
+database_id = "e1a99cbb-995f-4974-9b7f-30e9df095953"
+
+# ── KV：会话（24h）、限流计数、列表缓存 ─────────────────────
+[[kv_namespaces]]
+binding = "CACHE_KV"
+id = "d7ece9d0d0b342c596191f888c59ac93"
+
+# ── R2：后台封面图与正文插图 ────────────────────────────────
+# 暂时不上 R2 也可以：把这一段留空/删掉，图片会以 base64 存在 D1 的 media 表里。
+[[r2_buckets]]
+binding = "BUCKET"
+bucket_name = "yisheng-media"
+
+# ── 普通变量（非密钥）────────────────────────────────────────
+# 这些可以被 wrangler 直接管理；密钥必须走 secret。
+[vars]
+AI_BASE_URL = "https://api.deepseek.com/v1"
+AI_MODEL = "deepseek-chat"
+AI_DISABLE_THINKING = "1"

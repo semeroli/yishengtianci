@@ -1,0 +1,31 @@
+{
+  "name": "yisheng-ai-ci",
+  "private": true,
+  "version": "1.0.0",
+  "description": "倚声 · AI填词工坊 —— 宋式美学的填词生成器 + 填词博客",
+  "type": "module",
+  "scripts": {
+    "dev": "node server/dev-server.mjs",
+    "dev:watch": "node server/dev-server.mjs --watch",
+    "build": "vite build",
+    "preview": "npm run build && node server/dev-server.mjs --prod",
+    "seed": "node scripts/seed.mjs",
+    "smoke": "node scripts/smoke-test.mjs",
+    "test:engine": "node scripts/test-engine.mjs",
+    "audit:rhyme": "node scripts/audit-rhyme.mjs",
+    "check": "npm run test:engine && npm run smoke",
+    "deploy": "npm run build && npx wrangler pages deploy dist --project-name yisheng",
+    "shots:admin": "node scripts/shots-admin.mjs"
+  },
+  "dependencies": {
+    "markdown-it": "^14.1.0",
+    "highlight.js": "^11.10.0",
+    "pinia": "^2.2.6",
+    "vue": "^3.5.13",
+    "vue-router": "^4.4.5"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-vue": "^5.2.1",
+    "vite": "^5.4.11"
+  }
+}
