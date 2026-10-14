@@ -158,7 +158,28 @@ Cloudflare 控制台粘贴时会吃掉换行，带 `--` 注释的那份可能整
 > 「此查询已成功执行」也只说明语法没错，`UPDATE` 匹配 0 行它照样这么说。
 > 只有 `no such table` 才是真错。最可靠的办法是让后台实际发一个请求 —— 能返回数据就说明表在。
 
-### 2. 设密钥（**必须**，否则令牌签名退化成开发默认值）
+### 2. 建管理员账号（**这一步不能省**）
+
+本项目的后台**没有「首次自助注册」**：登录页只会提示去找管理员，不会自己造账号。
+所以第一次上线必须往 `users` 表插一条记录，否则谁都登不进去。
+
+```bash
+node scripts/gen-admin.mjs > admin.txt   # 用户名 admin，自动生成 16 位强密码；
+                                         # 输出存进 admin.txt，密码只出现这一次
+npm run gen-admin                        # 同上，只是不落盘、直接看屏幕
+```
+
+脚本会打印一行 `INSERT OR IGNORE INTO users ... VALUES (...)`，**整行复制**粘进
+D1 控制台执行即可。它会先把密码散列出来、再用登录时的同一套逻辑回验一遍，
+三条自检（回验通过 / 错密码被拒 / 不含单引号）全过才输出 —— 避免插进去一个永远登不上的账号。
+
+- 想换账号：`ADMIN_USER=wang ADMIN_PWD='你的密码' node scripts/gen-admin.mjs`
+- 想换显示名：`ADMIN_NAME='李老师' node scripts/gen-admin.mjs`
+- 用的是 `INSERT OR IGNORE`：重复执行不报错，也不会覆盖你后来改过的密码
+- 插入的账号带 `must_change_pwd = 1`：首次登录成功后，后台会强制要求你改一个新密码
+- 本地开发不用这一步，直接 `npm run seed` 就行（默认 `admin / yisheng2026`）
+
+### 3. 设密钥（**必须**，否则令牌签名退化成开发默认值）
 
 ```bash
 npx wrangler pages secret put SITE_SECRET   # 随机串，长度 ≥ 16
@@ -169,12 +190,23 @@ npx wrangler pages secret put AI_API_KEY    # 不用 AI 可以不设
 所有普通变量删光再写入配置里的 `vars`，所以控制台填的明文变量每推一次代码就消失一次；
 Secret 永不被部署删除。非密钥的配置（如 `AI_MODEL`）写进 `wrangler.toml` 的 `[vars]`。
 
-### 3. 发布
+> `SITE_SECRET` 换掉之后，已发出去的登录令牌会全部失效 —— 这是预期行为（相当于强制所有人重新登录）。
+
+### 4. 发布
 
 在 Cloudflare Pages 上连这个 GitHub 仓库即可（推代码自动构建）。
 
-- **构建命令**：`npm run build`
-- **输出目录**：`dist`
+| 设置项 | 填什么 |
+|---|---|
+| 生产分支 | `main` |
+| 框架预设 | 选 `None` / `Vite` 都行 |
+| **构建命令** | `npm run build` |
+| **输出目录** | `dist` |
+| 根目录 | 留空（仓库根就是项目根） |
+
+> **产品类型必须选 Pages，不能选 Workers。** 本项目用的是 `functions/` 目录（Pages Functions
+> 的约定）配 `wrangler.toml` 的 `pages_build_output_dir`。建错产品类型会出现
+> `No functions dir at /functions found` 或 `Pages only supports files up to 25 MiB`。
 
 也可以本地手动发：
 
@@ -189,6 +221,41 @@ npm run deploy        # = vite build && wrangler pages deploy dist
 > 到了 Linux 构建机上会报 `Cannot find module @rollup/rollup-linux-x64-gnu`，构建直接失败。
 > 详见 `.gitignore` 里的说明。想恢复可复现安装，就把那行删掉并重新 `npm install`。
 
+#### 前端路由为什么会「一刷新就 404」
+
+本站前端用的是 History 模式路由（`createWebHistory`），`/blog/xxx`、`/admin/login`
+这些地址在服务器上**并不存在同名文件**。所以 `public/_redirects` 里必须留着这条：
+
+```
+/*    /index.html   200
+```
+
+它的作用：任何没命中静态文件的路径，都把 `index.html` 的内容返回去（状态码仍给 200），
+由前端路由自己解析地址。**少了它就会出现「站内点着走都正常、一刷新或直接输网址就 404」**。
+
+配套的还有：
+
+| 文件 | 作用 |
+|---|---|
+| `public/_redirects` | SPA 路由回退。`/api/*` 走的是 Functions，**不受这条规则影响**（官方明确：`_redirects` 不作用于 Functions 路由） |
+| `public/_headers` | 带指纹的 `assets/*` 缓存一年；`index.html` 不缓存，避免用户卡在旧版本白屏 |
+| `functions/robots.txt.js` | 让 `/robots.txt` 可用（内容由同一个 handler 生成，带 Sitemap 地址） |
+| `functions/sitemap.xml.js` | 让 `/sitemap.xml` 可用（从 `blog_posts` 动态生成） |
+
+后两个是薄转发层，路由逻辑本身仍在 `shared/api-handler.js`，本地和线上共用一份。
+
+### 5. 上线后怎么确认真的成了
+
+按顺序做这四件事，任何一步不对就停下来查：
+
+1. **打开首页** → 应看到「倚声 · AI填词工坊」，不是白屏、不是 404。
+2. **随手点进一个子页面再按 F5** → 例如 `/blog`、`/admin/login` 刷新后仍能正常显示。
+   这一步专门验 `_redirects` 有没有生效。
+3. **后台登录** → 打开 `https://<你的域名>/admin/login`，
+   用第 2 步生成的账号密码登录。看到「请修改密码」提示 = 建表和插账号都成功了。
+4. **登录后看首页数据** → 在后台「看板」页能看到卡片数字（此时全是 0 是正常的，库是空的）。
+   若这里报错 `no such table`，说明第 1 步的建表没跑成功。
+
 ---
 
 ## 六、常用命令
@@ -198,7 +265,8 @@ npm run deploy        # = vite build && wrangler pages deploy dist
 | `npm run dev` | 开发服务器（HMR，单端口 5173） |
 | `npm run build` | 生产构建。**它比开发服务器严——Vue 模板里的错误只有构建才报**，提交前跑一次 |
 | `npm run preview` | 构建 + 用 dist 起服务，验证生产形态 |
-| `npm run seed` | 灌示范数据 / 建管理员（`-- --admin=me --pwd=xxxx` 可换账号） |
+| `npm run seed` | 灌示范数据 / 建管理员（`-- --admin=me --pwd=xxxx` 可换账号）。**仅本地**，线上建管理员用下一行 |
+| `npm run gen-admin` | 生成线上管理员的初始化 SQL（见第五节第 2 步），输出一行可直接粘进 D1 控制台的 `INSERT` |
 | `npm run test:engine` | 填词引擎回归自测（110 项） |
 | `npm run smoke` | 接口端到端自测（163 项，跑在独立库 `.data/smoke.db`） |
 | `npm run check` | 上面两个一起跑 |
@@ -211,7 +279,9 @@ npm run deploy        # = vite build && wrangler pages deploy dist
 ## 七、后台管理系统（`/admin`）
 
 入口：`http://127.0.0.1:5173/admin`，**未登录会强制跳到 `/admin/login`**。
-默认账号 `admin / yisheng2026`（`npm run seed` 建的），**首次登录后请立刻改密**。
+本地默认账号 `admin / yisheng2026`（`npm run seed` 建的）。**线上的管理员是另一回事** ——
+用 `npm run gen-admin` 生成后插进 D1（见第五节第 2 步），两套互不影响。
+无论哪套，**首次登录后请立刻改密**。
 
 ### 有哪些页面
 

@@ -28,3 +28,8 @@ Thumbs.db
 
 # 后台真机截图产物（npm run shots:admin 生成）
 _shots/
+
+# 管理员初始化 SQL（npm run gen-admin 生成）—— 里面有密码散列，绝不提交。
+# schema/schema.sql 与 schema/schema.console.sql 是建表脚本，**要**提交；
+# 只有 *.local.sql 是本机生成的私密文件。
+schema/*.local.sql

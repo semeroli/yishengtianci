@@ -10,6 +10,7 @@
     "build": "vite build",
     "preview": "npm run build && node server/dev-server.mjs --prod",
     "seed": "node scripts/seed.mjs",
+    "gen-admin": "node scripts/gen-admin.mjs",
     "smoke": "node scripts/smoke-test.mjs",
     "test:engine": "node scripts/test-engine.mjs",
     "audit:rhyme": "node scripts/audit-rhyme.mjs",
