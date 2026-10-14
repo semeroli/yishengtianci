@@ -15,11 +15,15 @@ import { extname, join, resolve, normalize } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { handleApi } from '../shared/api-handler.js'
 import { createLocalEnv } from './d1-adapter.mjs'
+import { loadDevVars } from './load-dev-vars.mjs'
 
 const ROOT = resolve(fileURLToPath(new URL('..', import.meta.url)))
 const PORT = Number(process.env.PORT || 8787)
 const PROD = process.argv.includes('--prod')
 const DIST = join(ROOT, 'dist')
+
+// 先读本地密钥，再组装 env —— 顺序反了就白读。
+loadDevVars(join(ROOT, '.dev.vars'))
 
 const env = createLocalEnv({ dbFile: join(ROOT, '.data', 'yisheng.db') })
 

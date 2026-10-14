@@ -475,11 +475,18 @@ onMounted(async () => {
             不通过这个页面保存 —— 放数据库里等于把钥匙搁在门口。
           </p>
           <div class="kv"><span>通道状态</span><b>{{ settings.aiEnabled ? '已配置' : '未配置' }}</b></div>
-          <div class="kv"><span>需要的变量</span><b class="mono">AI_API_KEY / AI_BASE_URL / AI_MODEL / AI_DISABLE_THINKING</b></div>
+          <div class="kv"><span>需要的变量</span><b class="mono">AI_API_KEY / AI_BASE_URL / AI_MODEL / AI_DISABLE_THINKING / AI_TIMEOUT_MS</b></div>
+          <div class="kv"><span>默认服务商</span><b class="mono">魔搭社区（ModelScope）</b></div>
+          <div class="kv"><span>默认模型</span><b class="mono">Qwen/Qwen3.8-Flash-Next</b></div>
           <p class="tiny" style="color: var(--a-text-3); line-height: 1.9">
             没配密钥时，填词全部由本地格律引擎完成，功能不受影响。
-            接了推理型模型（如魔搭的 Qwen）记得把 <code class="mono">AI_DISABLE_THINKING</code> 设为 <code class="mono">1</code>，
-            否则 max_tokens 会被思考过程吃掉，正文还没开始就截断了。
+            魔搭上绝大多数模型是<b>推理型</b>，必须把 <code class="mono">AI_DISABLE_THINKING</code> 设为
+            <code class="mono">1</code>，否则 max_tokens 会被思考过程整段吃掉、正文还没开始就截断了。
+          </p>
+          <p class="tiny" style="color: var(--a-text-3); line-height: 1.9">
+            想换模型别凭感觉挑 —— 在本机跑 <code class="mono">npm run probe:models</code>，
+            它会把候选模型挨个真机试一遍（耗时 / 正文字数 / 合律句数），并跑「不关思考」对照。
+            换模型只改 <code class="mono">wrangler.toml</code> 里 <code class="mono">AI_MODEL</code> 一行。
           </p>
         </div>
       </div>

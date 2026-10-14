@@ -109,20 +109,77 @@ wrangler.toml           Cloudflare 绑定配置（D1 / KV / R2 / 普通变量）
 不配也能用：本地引擎功能是完整的。配上之后 `/generate` 会优先走 AI，
 **失败、超时、返回字数不符或韵脚重复都会自动回落本地引擎**（所以线上不会"转圈转到空"）。
 
+### 4.1 默认接魔搭社区（ModelScope）
+
+本地开发：复制示例文件按说明填好，`server/dev-server.mjs` 会自动读它。
+
 ```bash
-# 本地：复制 .dev.vars.example 为 .dev.vars 并填写
 cp .dev.vars.example .dev.vars
 ```
 
 ```
-AI_API_KEY=sk-xxxx
-AI_BASE_URL=https://api.deepseek.com/v1
-AI_MODEL=deepseek-chat
-AI_DISABLE_THINKING=1     # 推理型模型必须置 1，否则会输出 think 段
+AI_API_KEY=ms-xxxx                                  # 魔搭「访问令牌」
+AI_BASE_URL=https://api-inference.modelscope.cn/v1
+AI_MODEL=Qwen/Qwen3.8-Flash-Next
+AI_DISABLE_THINKING=1                               # 见 4.2，不是可选项
+AI_TIMEOUT_MS=45000
 ```
 
-⚠️ `AI_DISABLE_THINKING` 别漏：部分推理模型（通义 / 魔搭上的一些模型）默认会先"想一段"，
-不关掉的话返回的正文里混着思考过程，字数校验必然失败。
+### 4.2 ⚠️ 挑模型只有一条硬标准：关掉「思考」
+
+魔搭上**绝大多数模型都是推理模型**：默认会把 `max_tokens` 整段烧在「思考」上，
+正文一个字不吐 —— 症状是 `finish_reason=length`、`content` 为空、`reasoning_content` 上千字。
+所以 `AI_DISABLE_THINKING=1` **不是性能优化，是能不能用的前提**。
+
+代码里已经做了两件事（`shared/api-handler.js`）：
+
+1. 关思考时**两个字段名都发** —— `enable_thinking: false` + `chat_template_kwargs.enable_thinking: false`
+   （不同平台认的写法不一样，双保险）；
+2. **平台不认这个字段就自动退让** —— 先带字段发一次，若被 400/422 拒绝，去掉字段原样再发一次。
+   绝不会因为一个可选参数把整条 AI 通道打死。
+
+那具体选哪个模型？**不要凭感觉挑**，填好 Key 跑体检：
+
+```bash
+npm run probe:models            # 候选模型挨个真机试
+npm run probe:models --fast     # 只跑「关思考」一档，省额度
+npm run probe:models --conc=4   # 加大并发
+```
+
+体检用的是**线上真正发出去的那份 prompt 和解析逻辑**（直接从 `shared/api-handler.js` import，
+不是脚本里另抄一份），对每个模型报：耗时 / 正文字数 / 合律句数；
+对没通过的模型**再跑一次「原样不关思考」做对照** —— 那就是"思考吃光额度"的现场证据。
+它还会把冠军模型的试填词打印出来给你肉眼看。
+
+按「同类中文格律任务 + 45 秒内出结果」这个标准，建议按下面顺序试：
+
+| 顺序 | 模型 | 说明 |
+|---|---|---|
+| ★ 首选 | `Qwen/Qwen3.8-Flash-Next` | 通义 Flash 档，中文语感好、快，同类中文词句任务实测 8~13 秒完成 |
+| 备选 | `deepseek-ai/DeepSeek-V4-Flash-0731` | DeepSeek 系，中文稳 |
+| 备选 | `ZhipuAI/GLM-4.7-Flash` | 智谱 Flash 档，速度取向 |
+| 备选 | `MiniMax/MiniMax-M3` | 长文笔力更好，慢一些，注意超时 |
+
+> 换模型只改 `AI_MODEL` 一行，不用动任何业务代码。
+
+### 4.3 不用魔搭、接别家
+
+改上面两行即可，别家大多不是推理模型，那时 `AI_DISABLE_THINKING=0` 也行：
+
+```
+AI_BASE_URL=https://api.deepseek.com/v1      AI_MODEL=deepseek-chat
+AI_BASE_URL=https://dashscope.aliyuncs.com/compatible-mode/v1    AI_MODEL=qwen-plus
+```
+
+### 4.4 这套参数有回归闸门
+
+```bash
+npm run test:ai     # 34 项，不需要网络、不需要 Key，毫秒级
+```
+
+用桩件替换 `fetch`，把请求体逐字节验一遍：关思考字段有没有发、被 400 拒绝会不会退让、
+空正文报错有没有点明原因、`max_tokens` / `Authorization` / 超时有没有正确透传。
+这类线上故障**九成不是业务代码错，而是请求体少了一个字段**，靠肉眼 review 很难拦住。
 
 ---
 
@@ -179,16 +236,37 @@ D1 控制台执行即可。它会先把密码散列出来、再用登录时的�
 - 插入的账号带 `must_change_pwd = 1`：首次登录成功后，后台会强制要求你改一个新密码
 - 本地开发不用这一步，直接 `npm run seed` 就行（默认 `admin / yisheng2026`）
 
-### 3. 设密钥（**必须**，否则令牌签名退化成开发默认值）
+### 3. 设密钥 / 变量（**必须**，否则令牌签名退化成开发默认值）
+
+两处分工，别放错地方：
+
+| 放什么 | 放哪里 |
+|---|---|
+| `SITE_SECRET`、`AI_API_KEY` | 控制台 **Secret**（加密、不可回读） |
+| `AI_BASE_URL` / `AI_MODEL` / `AI_DISABLE_THINKING` / `AI_TIMEOUT_MS` | `wrangler.toml` 的 `[vars]`（明文、随仓库走） |
+
+命令行最省事、无歧义：
 
 ```bash
 npx wrangler pages secret put SITE_SECRET   # 随机串，长度 ≥ 16
 npx wrangler pages secret put AI_API_KEY    # 不用 AI 可以不设
 ```
 
-**必须选 Secret 类型，不能填成「明文变量」。** `wrangler deploy` 默认会先把 Worker 上
-所有普通变量删光再写入配置里的 `vars`，所以控制台填的明文变量每推一次代码就消失一次；
-Secret 永不被部署删除。非密钥的配置（如 `AI_MODEL`）写进 `wrangler.toml` 的 `[vars]`。
+> 🔴 **必须选 Secret 类型。** 密钥写进 `[vars]` 或控制台的「明文变量」会以明文
+> 出现在部署记录里；Secret 加密存储，且**永不被部署覆盖**。
+> 反过来，`AI_BASE_URL` 这类非密钥也**别**塞进 Secret —— 那就查不到了，换个人接手一头雾水。
+
+**在控制台加的话**，路径是 **项目 → Settings → Variables and secrets**。
+⚠️ **别点进 `Settings → Build` 里的那一个** —— Build 区那份只作用于「构建过程」，
+Functions 运行时读不到，症状是"界面里明明有、线上却报未配置"（这个坑我们在别的项目上真踩过，
+排查了一下午）。判据：页面上能看见 `Git repository:` / `Build configuration` 这些行，
+说明你在 Build 区，退出去到最外层的 `Variables and secrets`。
+
+⚠️ Pages 的变量分 **Production** 和 **Preview** 两套 —— 正式站点读的是 **Production** 那套，
+别只加了 Preview 就来问为什么没生效。
+
+⚠️ **Pages 上改完变量要重新部署一次才生效**（保存不算数）；改 `wrangler.toml` 的 `[vars]`
+则是推代码后自动带上。
 
 > `SITE_SECRET` 换掉之后，已发出去的登录令牌会全部失效 —— 这是预期行为（相当于强制所有人重新登录）。
 
@@ -301,8 +379,10 @@ npm run deploy        # = vite build && wrangler pages deploy dist
 | `npm run seed` | 灌示范数据 / 建管理员（`-- --admin=me --pwd=xxxx` 可换账号）。**仅本地**，线上建管理员用下一行 |
 | `npm run gen-admin` | 生成线上管理员的初始化 SQL（见第五节第 2 步），输出一行可直接粘进 D1 控制台的 `INSERT` |
 | `npm run test:engine` | 填词引擎回归自测（110 项） |
+| `npm run test:ai` | AI 通道参数回归自测（34 项，**不需要网络、不需要 Key**）。详见第四节 4.4 |
 | `npm run smoke` | 接口端到端自测（163 项，跑在独立库 `.data/smoke.db`） |
-| `npm run check` | 上面两个一起跑 |
+| `npm run check` | 上面三个一起跑 |
+| `npm run probe:models` | **模型体检**：把候选大模型挨个真机试一遍（耗时/正文字数/合律句数），并跑「不关思考」对照。换模型或线上出不来词时先跑它 |
 | `npm run shots:admin` | **后台真机渲染扫描**：真的用 Chrome 逐页打开后台，抓控制台报错 + 截图 + 核对是否白屏。改完后台 UI 必跑（见第七节） |
 | `npm run shots:landing` | **前台真机渲染扫描**：落地页与工作台 ×（桌面/移动 × 浅色/深色）共五张，另验横向溢出、favicon 家族、sitemap、控制台零报错。**改完落地页或前台 UI 必跑** |
 | `npm run verify:landing` | 复核落地页首屏那首样例词真合律、平仄符号用 ◐。改样例词后**必须**跑，别手改 |

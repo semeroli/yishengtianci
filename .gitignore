@@ -26,6 +26,10 @@ Thumbs.db
 .vscode/
 *.log
 
+# Vite 加载 vite.config.js 时会先把它打成临时包，正常会自动删；
+# 本机偶发残留（构建中断时），留着会被误提交。
+vite.config.js.timestamp-*.mjs
+
 # 后台真机截图产物（npm run shots:admin 生成）
 _shots/
 

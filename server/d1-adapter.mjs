@@ -135,6 +135,7 @@ export function createLocalEnv({ dbFile = '.data/yisheng.db', extra = {} } = {})
     AI_BASE_URL: process.env.AI_BASE_URL || '',
     AI_MODEL: process.env.AI_MODEL || '',
     AI_DISABLE_THINKING: process.env.AI_DISABLE_THINKING || '',
+    AI_TIMEOUT_MS: process.env.AI_TIMEOUT_MS || '',
     ...extra
   }
 }

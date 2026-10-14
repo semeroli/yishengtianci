@@ -19,9 +19,13 @@ import { fileURLToPath } from 'node:url'
 import { createServer as createViteServer } from 'vite'
 import { handleApi } from '../shared/api-handler.js'
 import { createLocalEnv } from './d1-adapter.mjs'
+import { loadDevVars } from './load-dev-vars.mjs'
 
 const ROOT = resolve(fileURLToPath(new URL('..', import.meta.url)))
 const PORT = Number(process.env.PORT || 5173)
+
+// 先读本地密钥，再组装 env —— 顺序反了就白读。
+loadDevVars(join(ROOT, '.dev.vars'))
 
 const env = createLocalEnv({ dbFile: join(ROOT, '.data', 'yisheng.db') })
 

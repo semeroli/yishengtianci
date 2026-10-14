@@ -14,8 +14,20 @@ SITE_SECRET=请换成一串你自己的随机字符_至少16位
 
 # AI 接口。留空则只用内置词库引擎（功能完整，不联网、零成本）。
 # 填了之后 /generate 会优先调用大模型，失败或超时自动回落本地引擎。
+#
+# 默认按魔搭社区（ModelScope）配，与 wrangler.toml 的 [vars] 保持一致。
+# Key 到 https://modelscope.cn 的「访问令牌」页面拿（形如 ms-xxxx）。
 AI_API_KEY=
-AI_BASE_URL=https://api.deepseek.com/v1
-AI_MODEL=deepseek-chat
-# 推理型模型（如部分通义/魔搭模型）会输出 think 段，必须关掉才能拿到干净的词句
+AI_BASE_URL=https://api-inference.modelscope.cn/v1
+AI_MODEL=Qwen/Qwen3.8-Flash-Next
+# 推理型模型（魔搭上绝大多数）必须置 1，否则正文空、max_tokens 全被思考吃掉
 AI_DISABLE_THINKING=1
+# 单次上游调用超时（毫秒）。填词正文很短，45 秒足够；换大模型可加大到 60000。
+AI_TIMEOUT_MS=45000
+#
+# 想先挑模型再定？填好 AI_API_KEY 后跑：npm run probe:models
+# 它会把候选模型挨个真机试一遍（耗时 / 正文字数 / JSON 是否合规），照着结果选。
+#
+# 不用魔搭、想接别家（DeepSeek / OpenAI / 通义）时改上面两行即可：
+#   AI_BASE_URL=https://api.deepseek.com/v1     AI_MODEL=deepseek-chat
+# 别家大多不是推理模型，那时 AI_DISABLE_THINKING 置 0 也行。

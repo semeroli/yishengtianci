@@ -701,10 +701,25 @@ const clientKey = (request) =>
   'local'
 
 // ── AI 通道（可选） ─────────────────────────────────────────
+//
+// 默认按「魔搭社区（ModelScope）」配置（见 wrangler.toml 的 [vars]）。
+// 魔搭上主流模型都是**推理模型**：默认会把 max_tokens 整段烧在「思考」上，
+// 正文一个字不吐（finish_reason=length、content 为空、reasoning_content 上千字）。
+// 所以关思考这件事不是可选优化，而是能不能用的前提。
+//
+// 关思考的写法各平台不统一（魔搭认 enable_thinking，vLLM/通义系还认
+// chat_template_kwargs），这里**两个字段都发**，并且**被 400 拒绝时自动退让**
+// 成原样再发一次 —— 不能因为一个可选参数把整条 AI 通道打死。
 
-const AI_TIMEOUT_MS = 45000
+const AI_DEFAULT_TIMEOUT_MS = 45000
 
-async function callUpstream(env, messages, { maxTokens = 1200 } = {}) {
+function aiTimeoutMs(env) {
+  const n = Number(env.AI_TIMEOUT_MS)
+  return Number.isFinite(n) && n > 0 ? n : AI_DEFAULT_TIMEOUT_MS
+}
+
+/** 单次调用上游。noThink=true 时在请求体里关掉「思考」。 */
+async function callUpstreamOnce(env, messages, { maxTokens = 1200, noThink = false } = {}) {
   const base = (env.AI_BASE_URL || 'https://api.openai.com/v1').replace(/\/+$/, '')
   const model = env.AI_MODEL || 'gpt-4o-mini'
   const resp = await fetch(`${base}/chat/completions`, {
@@ -718,10 +733,9 @@ async function callUpstream(env, messages, { maxTokens = 1200 } = {}) {
       messages,
       temperature: 0.85,
       max_tokens: maxTokens,
-      // 推理型模型会先花掉 max_tokens 再输出 content，这里明确关掉思考
-      ...(env.AI_DISABLE_THINKING === '1' ? { enable_thinking: false } : {})
+      ...(noThink ? { enable_thinking: false, chat_template_kwargs: { enable_thinking: false } } : {})
     }),
-    signal: AbortSignal.timeout(AI_TIMEOUT_MS)
+    signal: AbortSignal.timeout(aiTimeoutMs(env))
   })
   if (!resp.ok) {
     let hint = ''
@@ -737,10 +751,45 @@ async function callUpstream(env, messages, { maxTokens = 1200 } = {}) {
   const body = await resp.json().catch(() => null)
   if (!body) throw new Error('上游返回的不是 JSON')
   if (!body.choices) throw new Error('上游响应缺少 choices 字段')
+  const finish = body.choices[0]?.finish_reason || '?'
   const msg = body.choices[0]?.message || {}
-  const text = msg.content || msg.reasoning_content || ''
-  if (!text) throw new Error(`上游未返回内容（finish_reason=${body.choices[0]?.finish_reason || '?'}）`)
-  return { text, model }
+  const content = msg.content || ''
+  const reasoning = String(msg.reasoning_content || '')
+  // 思考段只在「正文空、但思考正常收尾」时才顶替正文。
+  // 若是 finish_reason=length 且正文为空 —— 那是额度被思考吃光了，
+  // 把 900 字的思绪当成「答案」只会让失败更难看懂，直接判失败并说明原因。
+  let text = content
+  if (!text && reasoning && finish !== 'length') text = reasoning
+  if (!text) {
+    const tip =
+      reasoning.length > 0
+        ? `；思考段却有 ${reasoning.length} 字 —— 典型「推理模型没关掉思考」（把 AI_DISABLE_THINKING 设为 1）`
+        : finish === 'length'
+          ? '；finish_reason=length，额度被截断（思考未关或 max_tokens 太小）'
+          : ''
+    throw new Error(`上游未返回内容（finish_reason=${finish}${tip}）`)
+  }
+  return { text, model, finish }
+}
+
+/**
+ * 关思考是「先试再退」：先带 enable_thinking 发一次，
+ * 平台不认这个字段（400/422）就原样再发一次。
+ */
+async function callUpstream(env, messages, opts = {}) {
+  const wantNoThink = opts.noThink ?? env.AI_DISABLE_THINKING === '1'
+  const maxTokens = opts.maxTokens ?? 1200
+  let lastErr = null
+  for (const noThink of wantNoThink ? [true, false] : [false]) {
+    try {
+      return await callUpstreamOnce(env, messages, { maxTokens, noThink })
+    } catch (e) {
+      lastErr = e
+      const rejectedField = noThink && (e?.status === 400 || e?.status === 422)
+      if (!rejectedField) throw e
+    }
+  }
+  throw lastErr
 }
 
 function buildAiPrompt(cipai, prompt) {
@@ -2569,3 +2618,6 @@ function normalizeDateTime(v) {
 }
 
 export { isGeneratable, getCipai, CIPAI }
+// 供 `scripts/probe-models.mjs`（模型体检）复用 —— 让它测的就是线上真正发的那份请求，
+// 而不是脚本里另抄一份 prompt（抄一份必然慢慢跑偏）。
+export { buildAiPrompt, callUpstream, parseAiLines }
