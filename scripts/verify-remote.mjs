@@ -95,7 +95,9 @@ const MUST = [
   'public/_redirects', 'public/_headers', 'functions/sitemap.xml.js', 'functions/robots.txt.js', 'wrangler.toml',
   // AI 通道：配置一行、请求体一个字段就能决定线上能不能用，必须点名
   'shared/api-handler.js', 'server/load-dev-vars.mjs', 'server/dev-server.mjs',
-  'scripts/probe-models.mjs', 'scripts/test-ai-params.mjs', '.dev.vars.example'
+  'scripts/probe-models.mjs', 'scripts/test-ai-params.mjs', '.dev.vars.example',
+  // 韵库补全 + 词牌 defaultBu 修正：这是本次推送的核心改动，必须确认推上去了
+  'shared/rhyme.js', 'shared/cipai.js', 'scripts/verify-rhyme.mjs', 'scripts/smoke-test.mjs'
 ]
 console.log('\n=== 关键文件 ===')
 for (const p of MUST) console.log(' ', remote.has(p) ? (okList.includes(p) ? '✓ 在且一致' : '△ 在但内容不同') : '✗ 缺失', p)

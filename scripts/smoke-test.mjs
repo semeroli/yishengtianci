@@ -168,8 +168,8 @@ async function main() {
   r = await call('GET', '/rhyme')
   const bus = A(r).bus || []
   // 7 平 + 4 仄 + 本轮新增的「第三部 · 支微齐（平）」= 12
-  ok('韵部简表 12 部', bus.length === 12, `实际 ${bus.length}`)
-  ok('韵部分平仄', bus.filter((b) => b.tone === '平').length === 8, `平声 ${bus.filter((b) => b.tone === '平').length} 部`)
+  ok('韵部简表 20 部', bus.length === 20, `实际 ${bus.length}`)
+  ok('韵部分平仄', bus.filter((b) => b.tone === '平').length === 12, `平声 ${bus.filter((b) => b.tone === '平').length} 部`)
   ok('每部都附了韵脚字数（界面要显示宽窄）', bus.every((b) => Number.isFinite(b.tailChars) || Number.isFinite(b.totalDistinct)))
 
   r = await call('GET', '/rhyme?q=' + encodeURIComponent('风月愁'))
