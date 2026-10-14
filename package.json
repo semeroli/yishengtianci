@@ -16,7 +16,10 @@
     "audit:rhyme": "node scripts/audit-rhyme.mjs",
     "check": "npm run test:engine && npm run smoke",
     "deploy": "npm run build && npx wrangler pages deploy dist --project-name yisheng",
-    "shots:admin": "node scripts/shots-admin.mjs"
+    "shots:admin": "node scripts/shots-admin.mjs",
+    "shots:landing": "node scripts/shots-landing.mjs",
+    "verify:remote": "node scripts/verify-remote.mjs",
+    "verify:landing": "node scripts/verify-landing-sample.mjs"
   },
   "dependencies": {
     "markdown-it": "^14.1.0",

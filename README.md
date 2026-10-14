@@ -304,6 +304,9 @@ npm run deploy        # = vite build && wrangler pages deploy dist
 | `npm run smoke` | 接口端到端自测（163 项，跑在独立库 `.data/smoke.db`） |
 | `npm run check` | 上面两个一起跑 |
 | `npm run shots:admin` | **后台真机渲染扫描**：真的用 Chrome 逐页打开后台，抓控制台报错 + 截图 + 核对是否白屏。改完后台 UI 必跑（见第七节） |
+| `npm run shots:landing` | **前台真机渲染扫描**：落地页与工作台 ×（桌面/移动 × 浅色/深色）共五张，另验横向溢出、favicon 家族、sitemap、控制台零报错。**改完落地页或前台 UI 必跑** |
+| `npm run verify:landing` | 复核落地页首屏那首样例词真合律、平仄符号用 ◐。改样例词后**必须**跑，别手改 |
+| `npm run verify:remote` | 推送后**逐字节核对远端**：走 api.github.com 读远端 tree，与本地按 git blob 规则算的哈希逐个比对。`git push` 会静默失败，所以推完必跑 |
 | `npm run audit:rhyme` | 韵书容量体检：哪些韵部撑不住哪个词牌 |
 | `npm run audit:rhyme -- 水调歌头 dong` | 逐句列出该词牌某韵部每一句能押哪些字（定位瓶颈） |
 
