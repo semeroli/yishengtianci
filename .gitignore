@@ -1,0 +1,30 @@
+# 依赖与产物
+node_modules/
+dist/
+
+# 🔴 锁文件**故意不提交**。
+# 本机这份 lock 只记录了 win32 平台的原生包（@rollup/rollup-win32-x64-msvc、
+# @esbuild/win32-x64），没有 linux 变体。仓库里一旦有 lock，Cloudflare 构建会自动
+# 改用 `npm ci`，而 npm ci 严格按 lock 安装 —— 到了 Linux 构建机上会报
+# `Cannot find module @rollup/rollup-linux-x64-gnu`，构建直接失败。
+# 不带 lock，云端就会跑 `npm install`，按当前平台正确解析可选依赖。
+# 想恢复可复现安装：删掉本行，并在本地重新 `npm install` 生成完整 lock。
+package-lock.json
+
+# 本地数据库（含自测库）与上传的媒体
+.data/
+
+# 本地密钥 —— 绝不要提交
+.dev.vars
+.env
+.env.*
+
+# 编辑器与系统
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.log
+
+# 后台真机截图产物（npm run shots:admin 生成）
+_shots/
