@@ -84,16 +84,24 @@ console.log(`✗ 两边内容不同 ${diff.length} 个` + (diff.length ? ':\n   
 console.log(`${extra.length ? '✗' : '✓'} 远端多出 ${extra.length} 个` + (extra.length ? ':\n   ' + extra.join('\n   ') : ''))
 
 // 关键文件点名
+// 关键文件点名 —— 推送脚本按目录/前缀批量排除时最容易**静默漏推**的就是这些：
+// 部署必需配置（下划线开头）、前台门面（图标 + 落地页）、以及只改几行但影响线上行为的配置与 AI 通道。
+// 新加「只改一行就影响线上」的文件时，顺手往这里补一条。
 const MUST = [
   'public/favicon.svg', 'public/favicon.ico', 'public/favicon-16.png', 'public/favicon-32.png',
   'public/favicon-48.png', 'public/favicon-96.png', 'public/apple-touch-icon.png',
   'public/icon-192.png', 'public/icon-512.png', 'public/site.webmanifest',
   'src/views/LandingView.vue', 'src/utils/branding.js', 'src/router/index.js',
-  'public/_redirects', 'public/_headers', 'functions/sitemap.xml.js', 'functions/robots.txt.js', 'wrangler.toml'
+  'public/_redirects', 'public/_headers', 'functions/sitemap.xml.js', 'functions/robots.txt.js', 'wrangler.toml',
+  // AI 通道：配置一行、请求体一个字段就能决定线上能不能用，必须点名
+  'shared/api-handler.js', 'server/load-dev-vars.mjs', 'server/dev-server.mjs',
+  'scripts/probe-models.mjs', 'scripts/test-ai-params.mjs', '.dev.vars.example'
 ]
 console.log('\n=== 关键文件 ===')
 for (const p of MUST) console.log(' ', remote.has(p) ? (okList.includes(p) ? '✓ 在且一致' : '△ 在但内容不同') : '✗ 缺失', p)
 
-const bad = miss.length + diff.length + extra.length + MUST.filter((p) => !remote.has(p)).length
+// 注意 bad 要把「△ 在但内容不同」也算进去 —— 只查 MISS 会漏掉「推上去了但推的是旧版」这种情况。
+const mustBad = MUST.filter((p) => !okList.includes(p))
+const bad = miss.length + diff.length + extra.length + mustBad.length
 console.log('\n' + (bad ? `❌ ${bad} 项需处理` : '✅ 远端与本地逐字节一致，推送确已生效'))
 process.exit(bad ? 1 : 0)
