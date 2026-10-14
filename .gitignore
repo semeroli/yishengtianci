@@ -29,7 +29,22 @@ Thumbs.db
 # 后台真机截图产物（npm run shots:admin 生成）
 _shots/
 
+# 落地页/局部的真机截图与放大复核产物（_shots-landing.mjs / _crop.mjs / _zoom.mjs 生成）
+_shots-landing/
+_crop/
+_zoom/
+/_icon-*.png
+
 # 管理员初始化 SQL（npm run gen-admin 生成）—— 里面有密码散列，绝不提交。
 # schema/schema.sql 与 schema/schema.console.sql 是建表脚本，**要**提交；
 # 只有 *.local.sql 是本机生成的私密文件。
 schema/*.local.sql
+
+# 仓库**根目录**下的本机临时物：_gh_push.mjs、_probe-*.mjs、上线清单等。
+# 注意用 / 开头做「根目录锚定」——public/_redirects、public/_headers 是
+# Cloudflare Pages 部署必需的配置，**必须**提交，不能被这里漏掉。
+/_*.mjs
+/_*.txt
+/_*.html
+/_*.log
+/_*.json

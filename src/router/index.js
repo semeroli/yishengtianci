@@ -3,8 +3,19 @@ import { getToken } from '../api.js'
 import { useSession } from '../stores/session.js'
 
 const routes = [
+  // ⚠️ 「/」从 2026-01 起是**落地页（官网首页）**，不再是填词工具本身。
+  //    工具挪到了 /studio。改这条时注意：站内所有「去填词」的入口都要指向 /studio，
+  //    只有品牌 logo、登录页「回到前台」这类「回首页」的语义才继续用 /。
   {
     path: '/',
+    name: 'home',
+    component: () => import('../views/LandingView.vue'),
+    // title 留空 ⇒ afterEach 里 document.title 走默认的「倚声 · AI填词工坊」；
+    // 落地页 onMounted 里会再调 setSeo() 补 description / og / JSON-LD，两者不冲突。
+    meta: { title: '' }
+  },
+  {
+    path: '/studio',
     name: 'workbench',
     component: () => import('../views/WorkbenchView.vue'),
     meta: { title: '填词工作台' }

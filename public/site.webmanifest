@@ -1,0 +1,40 @@
+{
+  "name": "倚声 · AI填词工坊",
+  "short_name": "倚声",
+  "description": "输入一段意境，选一个词牌，得一首合律的词。平仄与韵脚按《词林正韵》校验。",
+  "lang": "zh-CN",
+  "dir": "ltr",
+  "start_url": "/studio",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#F5F0E8",
+  "theme_color": "#F5F0E8",
+  "categories": ["books", "education", "productivity"],
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}

@@ -279,11 +279,13 @@ onMounted(async () => {
         <div class="grid2">
           <div class="adm-field">
             <label>Logo（emoji 或图片地址）</label>
-            <input v-model="settings.logo" class="input" type="text" placeholder="🏮" />
+            <input v-model="settings.logo" class="input" type="text" placeholder="留空 = 朱砂方印「倚」" />
+            <p class="hint">留空时顶栏与页脚显示朱砂方印「倚」（与浏览器标签图标同一枚记号）。想换成别的 emoji 或图片，填这里即可。</p>
           </div>
           <div class="adm-field">
             <label>Favicon 地址</label>
             <input v-model="settings.favicon" class="input" type="text" placeholder="/favicon.svg" />
+            <p class="hint">留空时用站点自带的全套图标（SVG / ICO / PNG / apple-touch-icon）。</p>
           </div>
         </div>
         <div class="adm-field">

@@ -31,7 +31,7 @@ onBeforeUnmount(() => (document.title = '倚声 · AI填词工坊'))
       <p class="sub">你要找的这页，像是被风翻走了——也许它改过名，也许地址敲错了一个字。</p>
       <div class="row">
         <RouterLink v-if="inAdmin" class="btn primary" to="/admin/dashboard">回后台看板</RouterLink>
-        <RouterLink v-else class="btn primary" to="/">回填词工作台</RouterLink>
+        <RouterLink v-else class="btn primary" to="/studio">回填词工作台</RouterLink>
         <RouterLink v-if="!inAdmin" class="btn" to="/blog">去博客看看</RouterLink>
         <RouterLink v-if="!inAdmin" class="btn ghost" to="/rhyme">查韵书</RouterLink>
       </div>

@@ -1,13 +1,13 @@
 <script setup>
-import { onMounted, ref } from 'vue'
-import { Api } from '../api.js'
+import { computed, onMounted, ref } from 'vue'
+import { loadBranding, BRAND_DEFAULTS, hasCustomLogo, SEAL_TEXT } from '../utils/branding.js'
 
-const site = ref({})
+// 与顶栏共用同一个 loadBranding() 缓存，页脚不再单独打一次设置接口
+const site = ref({ ...BRAND_DEFAULTS })
+const customLogo = computed(() => hasCustomLogo(site.value.logo))
+
 onMounted(async () => {
-  try {
-    const { data } = await Api.settings()
-    site.value = data || {}
-  } catch {}
+  site.value = await loadBranding()
 })
 const year = new Date().getFullYear()
 </script>
@@ -19,7 +19,8 @@ const year = new Date().getFullYear()
       <div class="ftr-grid">
         <div>
           <div class="ftr-brand">
-            <span class="lamp">{{ site.logo || '🏮' }}</span>
+            <span v-if="customLogo" class="lamp">{{ site.logo }}</span>
+            <span v-else class="brand-seal" aria-hidden="true">{{ SEAL_TEXT }}</span>
             <b>{{ site.site_name || '倚声 · AI填词工坊' }}</b>
           </div>
           <p class="small muted mb0">{{ site.site_desc || '输入一段意境，选一个词牌，得一首合律的词。' }}</p>
@@ -27,7 +28,7 @@ const year = new Date().getFullYear()
         <div>
           <h4>逛一逛</h4>
           <ul>
-            <li><RouterLink to="/">填词工作台</RouterLink></li>
+            <li><RouterLink to="/studio">填词工作台</RouterLink></li>
             <li><RouterLink to="/blog">填词博客</RouterLink></li>
             <li><RouterLink to="/rhyme">词林正韵速查</RouterLink></li>
             <li><RouterLink to="/favorites">我的词笺</RouterLink></li>
@@ -79,6 +80,21 @@ const year = new Date().getFullYear()
 }
 .lamp {
   font-size: 1.15rem;
+}
+/* 与顶栏、favicon 同一枚朱砂方印 */
+.brand-seal {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  flex-shrink: 0;
+  border-radius: 3px;
+  background: linear-gradient(135deg, #ce4a40, #9c2a25);
+  color: #fdf6ec;
+  font-family: var(--font-serif);
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1;
 }
 .ftr h4 {
   font-size: 0.86rem;

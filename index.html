@@ -6,7 +6,33 @@
     <title>倚声 · AI填词工坊</title>
     <meta name="description" content="输入一段意境，选一个词牌，得一首合律的词。附填词教程、名作赏析与格律知识。" />
     <meta name="theme-color" content="#F5F0E8" />
-    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='78' font-size='78'%3E%F0%9F%8F%AE%3C/text%3E%3C/svg%3E" />
+
+    <!--
+      站点图标（favicon）
+      ─────────────────────────────────────────────────────────
+      一枚朱砂方印，白文「倚」，见 public/favicon.svg。
+
+      为什么给这么多档，而不是只留一个：
+      · SVG      —— 现代浏览器（Chrome / Edge / Firefox / Safari 16+）首选，任意尺寸都清晰；
+      · .ico     —— 老浏览器、Windows 任务栏、以及**大量导航站与收藏夹爬虫**只会去
+                    根目录找 /favicon.ico，不认 SVG。少了它，被收录时就显示成默认白纸图标；
+      · PNG 16/32/48 —— 部分安卓浏览器与第三方聚合页只吃位图，给全档分布最稳；
+      · apple-touch-icon —— iOS「添加到主屏幕」用，必须是位图（iOS 不认 SVG）。
+      这些文件全部由 `node _icons.mjs` 从 favicon.svg 生成，改图形时重跑一次即可。
+
+      顺序说明：SVG 放最前，让现代浏览器直接用矢量版；.ico 用 shortcut icon 兜底。
+    -->
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="shortcut icon" href="/favicon.ico" />
+    <link rel="icon" type="image/png" sizes="96x96" href="/favicon-96.png" />
+    <link rel="icon" type="image/png" sizes="48x48" href="/favicon-48.png" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png" />
+    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
+    <link rel="manifest" href="/site.webmanifest" />
+    <meta name="application-name" content="倚声" />
+    <meta name="apple-mobile-web-app-title" content="倚声" />
+
     <!-- 社交分享默认值；文章页会由 src/utils/seo.js 改写成该篇自己的信息 -->
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="倚声 · AI填词工坊" />

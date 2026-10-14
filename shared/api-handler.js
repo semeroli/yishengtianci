@@ -521,7 +521,9 @@ async function ensureSchema(env) {
 const DEFAULT_SETTINGS = {
   site_name: '倚声 · AI填词工坊',
   site_desc: '输入一段意境，选一个词牌，得一首合律的词。',
-  logo: '🏮',
+  // 站头/页脚的品牌记号。留空 ⇒ 前台渲染朱砂方印「倚」（与 favicon 同一枚记号）。
+  // 1.0 时这里是 '🏮'；前台把那个旧默认值仍当作「未设置」，所以老库不用手工改。
+  logo: '',
   favicon: '',
   footer_note: '倚声填词，以韵为骨。',
   copyright: '© 倚声 · AI填词工坊',
@@ -1356,7 +1358,10 @@ async function route(path, method, ctx) {
       `SELECT slug, COALESCE(published_at, created_at) AS t FROM blog_posts WHERE status='published' ORDER BY t DESC LIMIT 500`
     ).all()
     const urls = [
+      // / 是落地页（官网首页），/studio 是填词工具本身 —— 两个都该被收录，
+      // 所以首页之后紧跟一条 /studio。旧地址 / 仍然可用，不会因改版失效。
       `<url><loc>${origin}/</loc><changefreq>weekly</changefreq><priority>1.0</priority></url>`,
+      `<url><loc>${origin}/studio</loc><changefreq>weekly</changefreq><priority>0.9</priority></url>`,
       `<url><loc>${origin}/blog</loc><changefreq>daily</changefreq><priority>0.9</priority></url>`,
       `<url><loc>${origin}/rhyme</loc><changefreq>monthly</changefreq><priority>0.6</priority></url>`,
       `<url><loc>${origin}/about</loc><changefreq>monthly</changefreq><priority>0.5</priority></url>`,

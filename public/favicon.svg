@@ -1,0 +1,56 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" role="img" aria-label="倚声">
+  <!--
+    倚声 · 站点图标（favicon）
+    ─────────────────────────────────────────────────────────
+    一枚朱砂方印，白文「倚」。取自项目既有的视觉身份：分享封面
+    og-default.svg 右下角那枚「倚声」印，以及 tokens.css 里的 --cinnabar。
+
+    四个设计取舍，都是为了「缩到 16px 还认得出」：
+
+    ① 一个字，不是两个字。竖排「倚声」在大图里好看，缩到浏览器标签页
+       就只剩两团墨。中文产品普遍用一个字（知乎的「知」、豆瓣的「豆」），
+       这是被反复验证过最小尺寸可读的做法。
+
+    ② 直角满幅，不做圆角。试过 9px / 14px 圆角的版本，看上去更像普通
+       App 图标；方印本来就是方的 —— 直角是「国风」的第一眼信号，
+       而「大气」也正来自这个方正饱满的色块。若平台自己要套圆角蒙版，
+       它会在外部再切，不影响内容。
+
+    ③ 衬线（宋体一脉）而不是黑体。横细竖粗、起笔带顿，放大看是国风，
+       缩小后笔画对比仍然撑得住。字体栈「有则用、无则退」：macOS/Windows
+       命中宋体，Linux 命中思源宋体，全都没有时退到系统衬线体（字形会变，
+       但仍然是「倚」，不会变成豆腐块）。
+
+    ④ 边栏用「略有出入」的四边形而不是规整矩形。真印章是手工刻的，
+       四边不会绝对平行。这点差别在 512px 下是「手刻感」，在 16px 下
+       完全看不见（约 0.1px），所以只赚不赔 —— 顺便也让它不像网页边框。
+
+    正文与边栏都用 #FDF6EC（宣纸白）而不是纯白：印泥盖在纸上本来就带纸色，
+    纯白会显得刺眼、发飘。
+  -->
+  <defs>
+    <!-- 极轻的斜向渐变：模仿印泥厚薄不均，避免大色块的塑料感 -->
+    <linearGradient id="ys-seal" x1="0" y1="0" x2="0.55" y2="1">
+      <stop offset="0" stop-color="#CE4A40" />
+      <stop offset="0.55" stop-color="#BE3A33" />
+      <stop offset="1" stop-color="#9C2A25" />
+    </linearGradient>
+  </defs>
+
+  <!-- 印底：直角满幅 -->
+  <rect width="64" height="64" fill="url(#ys-seal)" />
+
+  <!-- 边栏：四边稍有出入，像手工刻的 -->
+  <path d="M5.1 4.9 L58.9 5.5 L58.5 59.2 L5.5 58.6 Z"
+        fill="none" stroke="#FDF6EC" stroke-opacity="0.20"
+        stroke-width="1.35" stroke-linejoin="miter" />
+
+  <!--
+    白文「倚」。
+    居中用 text-anchor + dominant-baseline，而不是写死 dy ——
+    这样即使字体回退到别的衬线体，字仍然居中，不会偏上或偏下。
+  -->
+  <text x="32" y="32" text-anchor="middle" dominant-baseline="central"
+        font-family="Songti SC, SimSun, STSong, Source Han Serif SC, Noto Serif CJK SC, serif"
+        font-size="39" font-weight="700" fill="#FDF6EC">倚</text>
+</svg>

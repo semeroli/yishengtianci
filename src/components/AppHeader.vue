@@ -2,17 +2,23 @@
 import { computed, ref, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useTheme } from '../stores/ui.js'
-import { Api } from '../api.js'
+import { loadBranding, BRAND_DEFAULTS, hasCustomLogo, SEAL_TEXT } from '../utils/branding.js'
 
 const route = useRoute()
 const router = useRouter()
 const { theme, toggle } = useTheme()
 
-const site = ref({ site_name: '倚声 · AI填词工坊', logo: '🏮' })
+// 站名 / 顶栏图标从站点设置来。这里用 loadBranding() 而不是直接 Api.settings()，
+// 是为了和 main.js 共用同一条请求（否则同一个接口每页要拉两次）。
+const site = ref({ ...BRAND_DEFAULTS })
 const menuOpen = ref(false)
 
+// 后台填了自定义「站点图标」就用它；没填（或还是 1.0 的 🏮）就渲染朱砂方印，
+// 和浏览器标签页的 favicon 是同一个记号。
+const customLogo = computed(() => hasCustomLogo(site.value.logo))
+
 const nav = [
-  { to: '/', label: '填词', key: 'workbench' },
+  { to: '/studio', label: '填词', key: 'workbench' },
   { to: '/blog', label: '博客', key: 'blog' },
   { to: '/rhyme', label: '韵书', key: 'rhyme' },
   { to: '/favorites', label: '词笺', key: 'favorites' },
@@ -21,7 +27,10 @@ const nav = [
 
 const active = computed(() => {
   const p = route.path
-  if (p === '/') return 'workbench'
+  // 落地页（/）不属于任何导航项，不点亮任何一个 ——
+  // 否则站在首页上却高亮「填词」，会让人以为自己已经在工具页了。
+  if (p === '/') return ''
+  if (p.startsWith('/studio')) return 'workbench'
   if (p.startsWith('/blog')) return 'blog'
   if (p.startsWith('/rhyme')) return 'rhyme'
   if (p.startsWith('/favorites')) return 'favorites'
@@ -30,10 +39,7 @@ const active = computed(() => {
 })
 
 onMounted(async () => {
-  try {
-    const { data } = await Api.settings()
-    if (data?.site_name) site.value = data
-  } catch {}
+  site.value = await loadBranding()
 })
 
 function go(to) {
@@ -46,7 +52,8 @@ function go(to) {
   <header class="hdr no-print">
     <div class="wrap hdr-inner">
       <RouterLink to="/" class="brand" @click="menuOpen = false">
-        <span class="lamp">{{ site.logo || '🏮' }}</span>
+        <span v-if="customLogo" class="lamp">{{ site.logo }}</span>
+        <span v-else class="brand-seal" aria-hidden="true">{{ SEAL_TEXT }}</span>
         <span class="brand-text">
           <b>{{ site.site_name || '倚声 · AI填词工坊' }}</b>
           <em>依谱填词 · 以韵为骨</em>
@@ -108,6 +115,21 @@ function go(to) {
 }
 .lamp {
   font-size: 1.4rem;
+  line-height: 1;
+}
+/* 朱砂方印「倚」—— 与 public/favicon.svg 同一枚记号，也与落地页落款一致 */
+.brand-seal {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  flex-shrink: 0;
+  border-radius: 3px;
+  background: linear-gradient(135deg, #ce4a40, #9c2a25);
+  color: #fdf6ec;
+  font-family: var(--font-serif);
+  font-size: 17px;
+  font-weight: 700;
   line-height: 1;
 }
 .brand-text {

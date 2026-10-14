@@ -167,7 +167,7 @@ onBeforeUnmount(() => {
 
     <template v-else-if="post">
       <nav class="crumbs small muted">
-        <RouterLink to="/">填词</RouterLink>
+        <RouterLink to="/studio">填词</RouterLink>
         <span>/</span>
         <RouterLink to="/blog">博客</RouterLink>
         <span>/</span>
