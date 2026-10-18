@@ -9,6 +9,7 @@ import PoemBoard from '../components/PoemBoard.vue'
 import RhythmAnalysis from '../components/RhythmAnalysis.vue'
 import RhymeLookup from '../components/RhymeLookup.vue'
 import CardStudio from '../components/CardStudio.vue'
+import { setSeo } from '../utils/seo.js'
 
 const {
   cipaiList,
@@ -125,6 +126,15 @@ function useInspiration() {
 }
 
 onMounted(async () => {
+  // 每页都要有自己的 description 与 canonical ——
+  // 否则 /studio 与首页共用同一段描述，搜索结果里会显示成同一句话；
+  // 而且 /studio 与 /studio/ 都能打开，没有 canonical 就是两份重复内容。
+  setSeo({
+    title: '填词工作台',
+    description:
+      '输入一句意境、选一个词牌，生成一首合律的词：平仄逐字校验，韵脚按《词林正韵》归部，自动避开重韵，不满意的句子可以单独换。',
+    url: location.origin + '/studio'
+  })
   await loadCipai()
   loadFavorites()
   loadInspiration()

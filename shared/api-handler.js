@@ -1137,6 +1137,13 @@ async function route(path, method, ctx) {
     if (!qstr) {
       const width = new Map(rhymeTailStats().map((s) => [s.id, s]))
       return ok({
+        /** 首页「数字条」直接读这三个字段 —— 不在前端写死数字。
+         *  踩过的坑：韵库从 12 部补到 20 部后，落地页还写着「12 个韵部」，
+         *  等于对外说假话。注意 totalChars 必须跨部去重（各部字数之和 1619，
+         *  去重后其实是 1599，有 20 个字跨部重复）。 */
+        parts: RHYME_BU.length,
+        pingParts: RHYME_BU.filter((b) => b.tone === '平').length,
+        totalChars: new Set(RHYME_BU.flatMap((b) => b.chars)).size,
         bus: RHYME_BU.map((b) => ({
           id: b.id,
           name: b.name,
@@ -1243,9 +1250,14 @@ async function route(path, method, ctx) {
     })
   }
 
-  m = path.match(/^\/posts\/([\w\u4e00-\u9fa5-]+)$/)
+  // ⚠️ 这里**不能**写 `/^\/posts\/([\w\u4e00-\u9fa5-]+)$/`：
+  //    path 是 url.pathname，**百分号编码过的**。中文别名 `第一次填词-该选哪个词牌`
+  //    在 path 里是 `%E7%AC%AC%E4%B8%80...`，`%` 不属于 \w，正则直接不匹配，
+  //    于是所有中文别名文章的详情页都返回「接口不存在」（2026-10-18 线上实测踩到）。
+  //    改成「一段非斜杠字符」再解码，才对得上这里 `decodeURIComponent` 的本意。
+  m = path.match(/^\/posts\/([^/]+)$/)
   if (m && method === 'GET') {
-    const slug = decodeURIComponent(m[1])
+    const slug = safeDecode(m[1])
     const row = await env.DB.prepare(`SELECT * FROM blog_posts WHERE slug = ? AND status='published'`).bind(slug).first()
     if (!row) return fail(404, '文章不存在或未发布')
     try {
@@ -1268,9 +1280,10 @@ async function route(path, method, ctx) {
     return ok({ ...mapPostRow(row), content_md: row.content_md, view_count: row.view_count + 1, comments, prev, next })
   }
 
-  m = path.match(/^\/posts\/([\w\u4e00-\u9fa5-]+)\/(share|like)$/)
+  // 同一个坑（见上一条注释）：中文别名编码后带 `%`，这里也必须按「非斜杠」匹配
+  m = path.match(/^\/posts\/([^/]+)\/(share|like)$/)
   if (m && method === 'POST') {
-    const slug = decodeURIComponent(m[1])
+    const slug = safeDecode(m[1])
     const kind = m[2]
     const row = await env.DB.prepare(`SELECT id FROM blog_posts WHERE slug = ?`).bind(slug).first()
     if (!row) return fail(404, '文章不存在')
@@ -1402,7 +1415,10 @@ async function route(path, method, ctx) {
 
   // ── SEO ─────────────────────────────────────────────────
   if (path === '/sitemap.xml' && method === 'GET') {
-    const origin = url.origin
+    // 站点有多个域名同时可访问，sitemap 里必须只出现**规范域**，
+    // 否则搜索引擎会拿到「同一份内容的三套地址」。规范域走 wrangler.toml 的
+    // SITE_ORIGIN（非密钥，属正常配置）；没配就退回请求域名，本地开发照常。
+    const origin = String(env.SITE_ORIGIN || url.origin).replace(/\/+$/, '')
     const { results } = await env.DB.prepare(
       `SELECT slug, COALESCE(published_at, created_at) AS t FROM blog_posts WHERE status='published' ORDER BY t DESC LIMIT 500`
     ).all()
@@ -1426,7 +1442,9 @@ async function route(path, method, ctx) {
   }
 
   if (path === '/robots.txt' && method === 'GET') {
-    return new Response(`User-agent: *\nAllow: /\nDisallow: /admin\nSitemap: ${url.origin}/sitemap.xml\n`, {
+    // Sitemap 地址同样只写规范域（理由见上面 /sitemap.xml 那段注释）
+    const siteOrigin = String(env.SITE_ORIGIN || url.origin).replace(/\/+$/, '')
+    return new Response(`User-agent: *\nAllow: /\nDisallow: /admin\nSitemap: ${siteOrigin}/sitemap.xml\n`, {
       headers: { 'Content-Type': 'text/plain; charset=utf-8' }
     })
   }
@@ -2435,8 +2453,21 @@ async function fetchComments(env, postId, approvedOnly) {
   return roots
 }
 
-function slugify(title) {
-  const base = String(title || '')
+/**
+ * 安全解码路径里的参数。
+ * `url.pathname` 是**百分号编码**过的（中文别名会是 `%E7%AC%AC…`），
+ * 而 `decodeURIComponent` 遇到残缺的 `%`（比如有人手敲 `/posts/100%`）会抛异常，
+ * 那样一个错地址就会变成 500。这里统一兜成空串，让它走「文章不存在」。
+ */
+function safeDecode(s) {
+  try {
+    return decodeURIComponent(s)
+  } catch {
+    return ''
+  }
+}
+
+function slugify(title) {  const base = String(title || '')
     .trim()
     .replace(/[^\u4e00-\u9fa5a-zA-Z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '')

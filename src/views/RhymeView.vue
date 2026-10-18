@@ -1,15 +1,35 @@
 <script setup>
-import { onBeforeUnmount, onMounted } from 'vue'
+import { onBeforeUnmount, onMounted, ref } from 'vue'
 import RhymeLookup from '../components/RhymeLookup.vue'
+import { Api } from '../api.js'
 import { setSeo } from '../utils/seo.js'
 
-onMounted(() =>
+/* 韵部 / 韵字的口径一律**从接口现算**，不写死 ——
+   上一轮把韵库从 12 部补到 20 部之后，这页还写着「只收最常用的十二个韵部（八平四仄）」。
+   默认值 = 接口没通时的兜底，等于当前真实值。 */
+const parts = ref(20)
+const ping = ref(12)
+const ze = ref(8)
+const chars = ref(1599)
+
+onMounted(async () => {
   setSeo({
     title: '韵书速查',
     description: '词林正韵简表与查字归韵：输入一个字，看它属于哪个韵部、是平声还是仄声，写词选韵一步到位。',
     url: location.origin + '/rhyme'
   })
-)
+  try {
+    const { data } = await Api.rhyme()
+    if (data?.parts) {
+      parts.value = data.parts
+      ping.value = data.pingParts ?? ping.value
+      ze.value = data.parts - ping.value
+      chars.value = data.totalChars ?? chars.value
+    }
+  } catch {
+    /* 接口不通就保持默认值 —— 页面照样完整 */
+  }
+})
 onBeforeUnmount(() => (document.title = '倚声 · AI填词工坊'))
 </script>
 
@@ -60,7 +80,8 @@ onBeforeUnmount(() => (document.title = '倚声 · AI填词工坊'))
       </div>
 
       <p class="hint mb0">
-        本简表只收最常用的十二个韵部（八平四仄），是「够用」而非「完备」。
+        本简表收录常用韵部 {{ parts }} 个（平声 {{ ping }} 部、仄声 {{ ze }} 部），
+        共 {{ chars }} 个韵字，是「够用」而非「完备」。
         未收录的字不代表不合韵，正式创作建议对照《词林正韵》原书。
       </p>
     </section>

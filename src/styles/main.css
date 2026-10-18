@@ -257,13 +257,13 @@ select {
 }
 [data-theme='dark'] .btn.primary:hover:not(:disabled) {
   background: #f2ece0;
-  border-color: #f2ecec0;
+  border-color: #f2ece0;
   color: #1e2022;
 }
 
 .btn.cinnabar {
-  background: var(--cinnabar);
-  border-color: var(--cinnabar);
+  background: var(--cinnabar-solid);
+  border-color: var(--cinnabar-solid);
   color: #fff;
 }
 .btn.cinnabar:hover:not(:disabled) {
@@ -317,7 +317,9 @@ select {
   width: 100%;
   padding: 10px 12px;
   background: var(--paper-2);
-  border: 1px solid var(--line-strong);
+  /* 表单边框是「看不到就用不了」的必要边界 → --line-input（3.39:1）。
+     装饰细线（分隔、卡片描边）仍用 --line-strong，两者别混。 */
+  border: 1px solid var(--line-input);
   border-radius: var(--r);
   color: var(--ink);
   transition: border-color var(--t) var(--ease-ink), box-shadow var(--t), background var(--t);
@@ -350,7 +352,7 @@ select {
 }
 
 .counter {
-  font-size: 0.8rem;
+  font-size: var(--fs-sm);
   color: var(--ink-3);
   text-align: right;
   font-variant-numeric: tabular-nums;
@@ -370,14 +372,14 @@ select {
   border-radius: var(--r-pill);
   color: var(--azurite);
   background: transparent;
-  font-size: 0.76rem;
+  font-size: var(--fs-xs);
   letter-spacing: 0.05em;
   line-height: 1.7;
   white-space: nowrap;
 }
 .tag.gold {
-  border-color: var(--gamboge);
-  color: var(--gamboge);
+  border-color: var(--gamboge-ink);
+  color: var(--gamboge-ink);
 }
 .tag.red {
   border-color: var(--cinnabar-soft);
@@ -479,9 +481,9 @@ select {
 }
 
 .char-cell .mark {
-  font-size: 0.62rem;
+  font-size: var(--fs-xs); /* 12px —— 中文的最小可读尺寸，原来只有 9.9px */
   line-height: 1;
-  color: var(--ink-4);
+  color: var(--ink-3);
   margin-top: 1px;
   letter-spacing: 0;
 }
@@ -500,7 +502,7 @@ select {
   font-weight: 600;
 }
 .char-cell.both .mark {
-  color: var(--ink-4);
+  color: var(--ink-3);
 }
 
 /* ═══════════ 竖排 ═══════════ */
@@ -524,7 +526,7 @@ select {
   margin-bottom: 2px;
 }
 .vertical-board .char-cell .mark {
-  font-size: 0.55rem;
+  font-size: var(--fs-xs);
 }
 .vertical-board .vline.rhyme-line .ch {
   color: var(--cinnabar);
@@ -712,7 +714,7 @@ select {
   font-size: 0.86rem;
 }
 .tiny {
-  font-size: 0.78rem;
+  font-size: var(--fs-sm);
 }
 .mono {
   font-family: var(--font-mono);

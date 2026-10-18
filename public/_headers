@@ -4,12 +4,16 @@
 # 前端每次构建，JS / CSS 的文件名里都会带一段内容指纹（如 index-a1b2c3.js），
 # 内容一变文件名就变 —— 这类文件可以放心让浏览器缓存一年。
 #
-# 但 index.html **不能**缓存太久。踩过的真实坑是这样的：
+# 但 HTML **不能**缓存太久。踩过的真实坑是这样的：
 #   ① 用户访问过旧版本，浏览器把旧的 index.html 存在了本地；
 #   ② 你发布了新版本，旧的那批 JS 文件在服务器上已经没有了；
 #   ③ 用户再打开网站，浏览器直接用本地缓存的旧 index.html，
 #      里面的 JS 文件名还是旧的 → 服务器上找不到 → 页面白屏。
 # 所以这里让 HTML 每次都回源校验，避免「用户还停留在旧版本」。
+#
+# ⚠️ 预渲染产出的那几个 HTML（studio.html / blog.html / …）同样是 HTML，
+#    同样必须「每次都回源」，所以每一个都单独写一条 ——
+#    漏一个的后果就是那个页面的用户会长期看到旧版本。
 #
 # ── 规则读法 ─────────────────────────────────────────────────
 # 第一行写路径，下面缩进两格写响应头；规则之间用空行隔开。
@@ -18,4 +22,22 @@
   Cache-Control: public, max-age=31536000, immutable
 
 /index.html
+  Cache-Control: public, max-age=0, must-revalidate
+
+/studio.html
+  Cache-Control: public, max-age=0, must-revalidate
+
+/blog.html
+  Cache-Control: public, max-age=0, must-revalidate
+
+/rhyme.html
+  Cache-Control: public, max-age=0, must-revalidate
+
+/about.html
+  Cache-Control: public, max-age=0, must-revalidate
+
+/favorites.html
+  Cache-Control: public, max-age=0, must-revalidate
+
+/404.html
   Cache-Control: public, max-age=0, must-revalidate

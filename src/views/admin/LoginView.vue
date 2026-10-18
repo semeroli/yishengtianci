@@ -221,7 +221,7 @@ onMounted(() => {
 }
 .logo .sub {
   margin: 6px 0 0;
-  font-size: 0.8rem;
+  font-size: var(--fs-sm);
   color: var(--a-text-3);
   letter-spacing: 0.1em;
 }
@@ -239,7 +239,7 @@ onMounted(() => {
   border: 0;
   background: transparent;
   color: var(--a-text-3);
-  font-size: 0.78rem;
+  font-size: var(--fs-sm);
   cursor: pointer;
   font-family: var(--a-font);
   padding: 4px 2px;

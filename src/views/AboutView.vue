@@ -140,7 +140,7 @@ onBeforeUnmount(() => (document.title = '倚声 · AI填词工坊'))
   justify-content: center;
   width: 46px;
   height: 46px;
-  background: var(--cinnabar);
+  background: var(--cinnabar-solid); /* 印面底色：上面压的是浅色「倚」字，必须用 solid 那支 */
   color: #fbf4ea;
   border-radius: 6px;
   font-size: 1.5rem;

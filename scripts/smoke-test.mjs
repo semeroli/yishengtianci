@@ -331,9 +331,40 @@ async function main() {
   const postId = A(r).id
   ok('详情返回阅读量', Number.isFinite(A(r).view_count))
 
+  /* ── 中文别名（回归：2026-10-18 线上「接口不存在」）──────────────
+   * 病根：请求路径 `url.pathname` 是**百分号编码**过的，而旧的匹配正则写的是
+   *   /^\/posts\/([\w\u4e00-\u9fa5-]+)$/
+   * `%` 不属于 \w ⇒ 中文别名（编码后必带 %）一条都匹配不上，
+   * 于是所有中文别名文章的详情页都回「接口不存在」。
+   * 原来的自测只用 ASCII 别名 smoke-draft-post，所以 163 项全绿也测不出来。
+   * ⚠️ 这里必须显式 encodeURIComponent（模拟真实网络路径），否则测的不是线上那条路。 */
+  r = await call('POST', '/admin/posts', {
+    token,
+    body: { title: '中文别名测试：该选哪个词牌？', content_md: '正文', category: '填词教程', status: 'published' }
+  })
+  const cnId = A(r).id
+  const cnSlug = A(r).slug
+  ok('中文标题自动生成别名（标点变 -）', cnSlug === '中文别名测试-该选哪个词牌', `实际 ${cnSlug}`)
+
+  r = await call('GET', '/posts/' + encodeURIComponent(cnSlug))
+  ok('中文别名文章详情能打开', r.status === 200 && String(A(r).title || '').includes('中文别名测试'), `${r.status} ${JSON.stringify(r.body).slice(0, 90)}`)
+
+  r = await call('POST', '/posts/' + encodeURIComponent(cnSlug) + '/like')
+  ok('中文别名也能点赞', r.status === 200 && Number.isFinite(A(r).like_count), `${r.status}`)
+
+  r = await call('POST', '/posts/' + encodeURIComponent(cnSlug) + '/share')
+  ok('中文别名也能分享计数', r.status === 200 && Number.isFinite(A(r).share_count), `${r.status}`)
+
+  r = await call('GET', '/posts/' + encodeURIComponent('并不存在的：别名'))
+  ok('查不到的中文别名 → 说「文章不存在」，不是「接口不存在」', r.status === 404 && /文章不存在/.test(String(r.body.message || '')), `${r.status} ${r.body.message}`)
+
+  r = await call('GET', '/posts/100%')
+  ok('残缺的百分号不会 500', r.status === 404, `${r.status}`)
+
+  await call('DELETE', `/admin/posts/${cnId}`, { token })
+
   r = await call('GET', '/posts?q=' + encodeURIComponent('自测草稿'))
   ok('关键词搜索命中', (A(r).total || 0) >= 1)
-
   r = await call('GET', '/posts?category=' + encodeURIComponent('格律知识'))
   ok('分类筛选生效', (A(r).list || []).every((p) => p.category === '格律知识'))
 

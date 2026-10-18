@@ -219,7 +219,7 @@ const zeBus = computed(() => bus.value.filter((b) => b.tone === '仄'))
   gap: 5px;
 }
 .tiny-chip {
-  font-size: 0.76rem;
+  font-size: var(--fs-xs);
   padding: 2px 9px;
 }
 .bu-hit {
@@ -269,14 +269,14 @@ const zeBus = computed(() => bus.value.filter((b) => b.tone === '仄'))
 }
 .bu-card .chars {
   margin: 7px 0 0;
-  color: var(--ink-4);
+  color: var(--ink-3); /* 韵字是**内容**不是装饰，不能压在 ink-4 那档（原 ink-4 深色下仅 2.88:1） */
   word-break: break-all;
   line-height: 1.7;
   max-height: 42px;
   overflow: hidden;
 }
 .muted2 {
-  color: var(--ink-4);
+  color: var(--ink-3); /* 承运「清丽 / 婉约」这类韵部风格词 —— 是内容，不是占位 */
 }
 .azurite {
   color: var(--azurite);

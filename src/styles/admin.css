@@ -182,7 +182,7 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  font-size: 0.8rem;
+  font-size: var(--fs-sm);
   flex-shrink: 0;
 }
 .adm-who .nm {
@@ -192,7 +192,7 @@
 }
 .adm-who .rl {
   color: var(--a-side-text-dim);
-  font-size: 0.74rem;
+  font-size: var(--fs-xs);
   white-space: nowrap;
 }
 
@@ -216,7 +216,7 @@
 }
 .adm-group-title {
   padding: 12px 20px 6px;
-  font-size: 0.72rem;
+  font-size: var(--fs-xs);
   letter-spacing: 0.18em;
   color: var(--a-side-text-dim);
 }
@@ -270,7 +270,7 @@
   border-radius: 9px;
   background: var(--a-primary);
   color: #fff;
-  font-size: 0.68rem;
+  font-size: var(--fs-xs);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -285,7 +285,7 @@
   padding: 14px 20px 6px;
   border-top: 1px solid rgba(255, 255, 255, 0.07);
   color: var(--a-side-text-dim);
-  font-size: 0.76rem;
+  font-size: var(--fs-xs);
   line-height: 1.9;
 }
 .adm-main {
@@ -371,6 +371,21 @@
 [data-theme='dark'] .adm-scope .btn:hover:not(:disabled) {
   border-color: #4a5058;
 }
+/* 禁用态：不要用「品牌红 × 45% 透明」——在纸底上会糊成一片淡粉，
+   看着像报错而不是「还不能点」。改用中性灰底 + 灰字，语义更准。 */
+.adm-scope .btn:disabled {
+  opacity: 1;
+  background: var(--a-line-2);
+  border-color: var(--a-line);
+  color: var(--a-text-3);
+  cursor: not-allowed;
+}
+.adm-scope .btn.primary:disabled,
+.adm-scope .btn.cinnabar:disabled {
+  background: var(--a-line);
+  border-color: var(--a-line);
+  color: var(--a-text-3);
+}
 .adm-scope .btn.primary,
 .adm-scope .btn.cinnabar {
   background: var(--a-primary);
@@ -394,7 +409,7 @@
 }
 .adm-scope .btn.sm {
   padding: 4px 10px;
-  font-size: 0.8rem;
+  font-size: var(--fs-sm);
 }
 .adm-scope .btn.lg {
   padding: 10px 26px;
@@ -536,7 +551,7 @@
 /* 表单错误：输入框下方红色微提示 */
 .adm-field .err {
   color: var(--a-danger);
-  font-size: 0.78rem;
+  font-size: var(--fs-sm);
   margin-top: 4px;
 }
 .adm-scope .input.is-err,
@@ -628,7 +643,7 @@ table.adm-table th {
   text-align: left;
   font-weight: 600;
   color: var(--a-text-3);
-  font-size: 0.78rem;
+  font-size: var(--fs-sm);
   letter-spacing: 0.08em;
   padding: 10px 12px;
   border-bottom: 1px solid var(--a-line);
@@ -672,7 +687,7 @@ table.adm-table .t-title {
 }
 table.adm-table .t-sub {
   color: var(--a-text-3);
-  font-size: 0.78rem;
+  font-size: var(--fs-sm);
   margin-top: 2px;
 }
 table.adm-table .num {
@@ -694,7 +709,7 @@ table.adm-table .num {
   gap: 4px;
   padding: 1px 9px;
   border-radius: var(--a-radius);
-  font-size: 0.76rem;
+  font-size: var(--fs-xs);
   line-height: 1.7;
   white-space: nowrap;
   border: 1px solid transparent;
@@ -732,7 +747,7 @@ table.adm-table .num {
   border: 1px solid var(--a-line);
   border-radius: var(--a-radius);
   color: var(--a-text-2);
-  font-size: 0.75rem;
+  font-size: var(--fs-xs);
   background: var(--a-card-2);
   white-space: nowrap;
 }
@@ -818,7 +833,7 @@ table.adm-table .num {
   line-height: 1.1;
 }
 .adm-stat .ft {
-  font-size: 0.8rem;
+  font-size: var(--fs-sm);
   color: var(--a-text-3);
   display: flex;
   align-items: center;
@@ -1025,12 +1040,12 @@ table.adm-table .num {
 }
 .adm-list-row .sl {
   font-family: var(--a-font-mono);
-  font-size: 0.76rem;
+  font-size: var(--fs-xs);
   color: var(--a-text-3);
 }
 .adm-list-row .cnt {
   color: var(--a-text-3);
-  font-size: 0.8rem;
+  font-size: var(--fs-sm);
   font-variant-numeric: tabular-nums;
 }
 .adm-list-row .sp {
@@ -1080,13 +1095,13 @@ table.adm-table .num {
   border-top: 1px solid var(--a-line-2);
 }
 .adm-media-cell .meta .fn {
-  font-size: 0.8rem;
+  font-size: var(--fs-sm);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 .adm-media-cell .meta .sz {
-  font-size: 0.72rem;
+  font-size: var(--fs-xs);
   color: var(--a-text-3);
   margin-top: 2px;
   font-variant-numeric: tabular-nums;
@@ -1163,7 +1178,7 @@ table.adm-table .num {
   align-items: center;
   gap: 8px;
   font-family: var(--a-font-mono);
-  font-size: 0.8rem;
+  font-size: var(--fs-sm);
   color: var(--a-text-3);
 }
 .adm-slug-row input {
@@ -1193,7 +1208,7 @@ table.adm-table .num {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  font-size: 0.78rem;
+  font-size: var(--fs-sm);
   color: var(--a-text-3);
   font-variant-numeric: tabular-nums;
 }
@@ -1278,14 +1293,14 @@ table.adm-table .num {
 .adm-log-row .t {
   font-variant-numeric: tabular-nums;
   color: var(--a-text-3);
-  font-size: 0.78rem;
+  font-size: var(--fs-sm);
   width: 138px;
   flex-shrink: 0;
 }
 .adm-log-row .ip {
   font-family: var(--a-font-mono);
   color: var(--a-text-2);
-  font-size: 0.78rem;
+  font-size: var(--fs-sm);
 }
 .adm-log-row .sp {
   flex: 1;
@@ -1410,7 +1425,7 @@ table.adm-table .num {
   table.adm-table td::before {
     content: attr(data-label);
     color: var(--a-text-3);
-    font-size: 0.76rem;
+    font-size: var(--fs-xs);
     min-width: 62px;
     flex-shrink: 0;
   }
@@ -1457,7 +1472,7 @@ table.adm-table .num {
     padding: 8px 4px 9px;
     color: var(--a-side-text-dim);
     text-decoration: none;
-    font-size: 0.68rem;
+    font-size: var(--fs-xs);
     position: relative;
   }
   .adm-tabbar a .ic {
@@ -1486,7 +1501,7 @@ table.adm-table .num {
     border-radius: 8px;
     background: var(--a-primary);
     color: #fff;
-    font-size: 0.6rem;
+    font-size: var(--fs-xs);
     display: inline-flex;
     align-items: center;
     justify-content: center;

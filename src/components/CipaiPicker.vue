@@ -236,7 +236,7 @@ function pick(id) {
 }
 .tg {
   font-style: normal;
-  font-size: 0.68rem;
+  font-size: var(--fs-xs);
   padding: 0 6px;
   border-radius: var(--r-pill);
   border: 1px solid var(--line-strong);
@@ -244,8 +244,8 @@ function pick(id) {
   line-height: 1.6;
 }
 .tg.style {
-  border-color: var(--gamboge);
-  color: var(--gamboge);
+  border-color: var(--gamboge-ink);
+  color: var(--gamboge-ink);
 }
 .tg.tone {
   border-color: var(--azurite-soft);
@@ -259,12 +259,12 @@ function pick(id) {
   position: absolute;
   right: 6px;
   bottom: 6px;
-  width: 20px;
-  height: 20px;
+  width: 22px;
+  height: 22px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  font-size: 0.66rem;
+  font-size: var(--fs-xs);
   border: 1px solid var(--line-strong);
   border-radius: 3px;
   color: var(--ink-3);

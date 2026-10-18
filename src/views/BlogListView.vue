@@ -3,6 +3,7 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { Api } from '../api.js'
 import { excerpt, fmtDate, fmtNum } from '../utils/format.js'
+import { setSeo } from '../utils/seo.js'
 
 /**
  * 填词博客 · 列表页
@@ -88,7 +89,17 @@ const allCats = computed(() => {
 })
 
 watch(() => route.fullPath, load)
-onMounted(load)
+onMounted(() => {
+  // 列表页也要有独立的 description / canonical —— 分类与搜索页共用同一个
+  // 规范地址是刻意的：?category=/?q= 这些是同一份内容的筛选视图，
+  // 让搜索引擎只收一个入口，避免同一批文章被切成几十个「页面」。
+  setSeo({
+    title: '填词博客',
+    description: '倚声的填词博客：格律怎么认、古人怎么写、意象怎么挑，以及名作赏析与创作心得，都写在这里。',
+    url: location.origin + '/blog'
+  })
+  load()
+})
 </script>
 
 <template>
@@ -213,7 +224,7 @@ onMounted(load)
   gap: 7px;
 }
 .cats .n {
-  font-size: 0.68rem;
+  font-size: var(--fs-xs);
   opacity: 0.7;
   margin-left: 3px;
 }

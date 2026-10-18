@@ -269,7 +269,7 @@ onMounted(load)
   border-radius: 3px;
   background: var(--a-line-2);
   color: var(--a-text-3);
-  font-size: 0.74rem;
+  font-size: var(--fs-xs);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -296,7 +296,7 @@ onMounted(load)
 }
 .nm {
   color: var(--a-text-3);
-  font-size: 0.78rem;
+  font-size: var(--fs-sm);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
@@ -318,7 +318,7 @@ onMounted(load)
 }
 .feed .vb {
   color: var(--a-text-3);
-  font-size: 0.78rem;
+  font-size: var(--fs-sm);
   white-space: nowrap;
 }
 .feed .tx {

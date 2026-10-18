@@ -247,7 +247,7 @@ const stats = computed(() => {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  font-size: 0.72rem;
+  font-size: var(--fs-xs);
   border: 1px solid var(--line-strong);
   border-radius: 50%;
   color: var(--ink-3);
@@ -264,7 +264,7 @@ const stats = computed(() => {
 }
 .arrow {
   color: var(--ink-3);
-  font-size: 0.8rem;
+  font-size: var(--fs-sm);
 }
 .acc-body {
   max-height: 0;
@@ -360,7 +360,9 @@ const stats = computed(() => {
   line-height: 1.2;
 }
 .dspec {
-  color: var(--ink-4);
+  /* 每格下方的平仄谱说明：报告口径是「符号和字要能一起看清」，
+     所以按 ink-2 这一档给，而不是原先那档几乎看不见的 ink-4。 */
+  color: var(--ink-2);
   line-height: 1.2;
 }
 .dmark {

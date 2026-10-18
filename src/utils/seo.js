@@ -3,11 +3,57 @@
  * ─────────────────────────────────────────────────────────────
  * 纯前端 SPA 没法像 SSR 那样把 meta 直接写进 HTML，所以策略是：
  *   ① index.html 里放好默认值（爬虫首屏能拿到站点级信息）；
- *   ② 文章页挂载后由这里把 title / description / og / JSON-LD 改写成本篇的。
+ *   ② 文章页挂载后由这里把 title / description / og / JSON-LD 改写成本篇的；
+ *   ③ 构建时再由 scripts/prerender.mjs 把渲染结果抄成静态 HTML，让不执行 JS 的爬虫也读得到。
  * 支持 og:image 动态化：传图就用图，不传就用站点默认封面。
  */
 
 const DEFAULT_IMAGE = '/og-default.svg'
+
+/**
+ * 站点的**规范地址**（canonical 的唯一真相）。
+ * ─────────────────────────────────────────────────────────────
+ * 为什么不能再用 `location.origin`：
+ *   同一个站现在有三个域名同时能打开（ystianci.de5.net / ystianci.kdns.fr /
+ *   yishengtianci.pages.dev）。规范地址必须**只有一个**，否则等于告诉搜索引擎
+ *   「这三份不同内容各收一份」，权重被自己摊薄。
+ *   所以这里写死一个规范域，任何域名下打开都声明同一份正版。
+ *
+ * ⚠️ 换主域名时**只改这一行**（外加 README 第十一节里对齐说一句）。
+ *    实测过：de5.net 这一族域名比 kdns.fr 快约 0.4s，也和本站其它项目统一。
+ */
+export const SITE_ORIGIN = 'https://ystianci.de5.net'
+
+/** 本站自己的域名（同一个站同时能打开的入口）。只有这些会被「拉回」规范域，
+ *  其它域名一律原样放行 —— 封面图可能存在 R2 的自定义域上，不能把人家改掉。 */
+const OWN_HOSTS = [
+  'ystianci.de5.net',
+  'ystianci.kdns.fr',
+  'yishengtianci.pages.dev',
+  '127.0.0.1',
+  'localhost'
+]
+
+/**
+ * 把「路径」或「本站任一域名下的绝对地址」归一到规范域名上。
+ * 传 `/blog` 得 `https://ystianci.de5.net/blog`；
+ * 传 kdns.fr / pages.dev 下的地址也拉回本站 —— 免得 canonical 被当前域名带偏。
+ * 外站地址（比如 R2 上的图片域名）原样返回。
+ */
+function absUrl(u) {
+  const s = String(u || '').trim()
+  if (!s) return SITE_ORIGIN + location.pathname
+  if (/^[a-z][a-z0-9+.-]*:\/\//i.test(s)) {
+    try {
+      const p = new URL(s)
+      if (p.origin === SITE_ORIGIN || !OWN_HOSTS.includes(p.hostname)) return s
+      return SITE_ORIGIN + p.pathname + p.search
+    } catch {
+      return SITE_ORIGIN + '/'
+    }
+  }
+  return SITE_ORIGIN + (s.startsWith('/') ? s : '/' + s)
+}
 
 function upsertMeta(attr, key, content) {
   if (content === undefined || content === null) return
@@ -43,8 +89,8 @@ let jsonLdEl = null
 export function setSeo(o = {}) {
   const siteName = '倚声 · AI填词工坊'
   const full = o.title ? `${o.title} · 倚声` : siteName
-  const url = o.url || location.origin + location.pathname
-  const image = o.image ? new URL(o.image, location.origin).href : new URL(DEFAULT_IMAGE, location.origin).href
+  const url = absUrl(o.url)
+  const image = absUrl(o.image || DEFAULT_IMAGE)
 
   document.title = full
   upsertMeta('name', 'description', o.description || '')
@@ -80,16 +126,16 @@ export function articleJsonLd({ title, description, image, url, published, modif
     '@type': 'Article',
     headline: title,
     description,
-    image: image ? [new URL(image, location.origin).href] : undefined,
+    image: image ? [absUrl(image)] : undefined,
     datePublished: published || undefined,
     dateModified: modified || published || undefined,
     author: { '@type': 'Person', name: author || '管理员' },
     publisher: {
       '@type': 'Organization',
       name: '倚声 · AI填词工坊',
-      logo: { '@type': 'ImageObject', url: new URL('/og-default.svg', location.origin).href }
+      logo: { '@type': 'ImageObject', url: absUrl(DEFAULT_IMAGE) }
     },
-    mainEntityOfPage: { '@type': 'WebPage', '@id': url }
+    mainEntityOfPage: { '@type': 'WebPage', '@id': absUrl(url) }
   }
 }
 
@@ -98,11 +144,11 @@ export function websiteJsonLd() {
     '@context': 'https://schema.org',
     '@type': 'WebSite',
     name: '倚声 · AI填词工坊',
-    url: location.origin + '/',
+    url: SITE_ORIGIN + '/',
     description: '输入一段意境，选一个词牌，得一首合律的词。',
     potentialAction: {
       '@type': 'SearchAction',
-      target: location.origin + '/blog?q={search_term_string}',
+      target: SITE_ORIGIN + '/blog?q={search_term_string}',
       'query-input': 'required name=search_term_string'
     }
   }

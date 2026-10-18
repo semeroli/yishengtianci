@@ -4,6 +4,7 @@ import { Api } from '../api.js'
 import { useWorkbench } from '../stores/workbench.js'
 import { confirmDialog, toast } from '../stores/ui.js'
 import { fmtRelative } from '../utils/format.js'
+import { setSeo } from '../utils/seo.js'
 
 /**
  * 我的词笺
@@ -63,7 +64,14 @@ async function copyPoem(f) {
   }
 }
 
-onMounted(loadFavorites)
+onMounted(() => {
+  setSeo({
+    title: '我的词笺',
+    description: '把生成的词和收藏的文章收在一处：随时回看、复制，也能做成一张竖排词卡存下来。',
+    url: location.origin + '/favorites'
+  })
+  loadFavorites()
+})
 </script>
 
 <template>
@@ -201,7 +209,7 @@ onMounted(loadFavorites)
   background: var(--paper-2);
   color: var(--ink-3);
   border-radius: var(--r);
-  font-size: 0.74rem;
+  font-size: var(--fs-xs);
   padding: 2px 8px;
   cursor: pointer;
   transition: all var(--t-fast);

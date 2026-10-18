@@ -60,7 +60,7 @@ function go(to) {
         </span>
       </RouterLink>
 
-      <nav class="nav" :class="{ open: menuOpen }">
+      <nav id="site-nav" class="nav" :class="{ open: menuOpen }">
         <a
           v-for="n in nav"
           :key="n.key"
@@ -74,12 +74,25 @@ function go(to) {
       </nav>
 
       <div class="hdr-actions">
-        <button class="icon-btn" :title="theme === 'dark' ? '点亮青灯' : '吹熄烛火'" @click="toggle">
+        <!-- 图标按钮必须给 aria-label：只写 title 的话，触屏上不显示、读屏也不可靠 -->
+        <button
+          class="icon-btn"
+          :aria-label="theme === 'dark' ? '切换到浅色主题' : '切换到深色主题'"
+          :title="theme === 'dark' ? '点亮青灯' : '吹熄烛火'"
+          @click="toggle"
+        >
           <span v-if="theme === 'dark'">🌙</span>
           <span v-else>☀️</span>
         </button>
-        <RouterLink to="/admin" class="icon-btn admin-entry" title="后台管理">⚙</RouterLink>
-        <button class="icon-btn burger" title="菜单" @click="menuOpen = !menuOpen">
+        <RouterLink to="/admin" class="icon-btn admin-entry" aria-label="后台管理" title="后台管理">⚙</RouterLink>
+        <button
+          class="icon-btn burger"
+          aria-label="打开导航菜单"
+          :aria-expanded="menuOpen ? 'true' : 'false'"
+          aria-controls="site-nav"
+          title="菜单"
+          @click="menuOpen = !menuOpen"
+        >
           {{ menuOpen ? '✕' : '☰' }}
         </button>
       </div>
@@ -144,7 +157,7 @@ function go(to) {
 }
 .brand-text em {
   font-style: normal;
-  font-size: 0.72rem;
+  font-size: var(--fs-xs);
   color: var(--ink-3);
   letter-spacing: 0.14em;
 }

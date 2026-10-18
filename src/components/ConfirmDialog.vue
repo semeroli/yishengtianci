@@ -1,5 +1,5 @@
 <script setup>
-import { computed, nextTick, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useConfirm, resolveConfirm } from '../stores/ui.js'
 
 /**
@@ -13,14 +13,34 @@ const { confirmState } = useConfirm()
 
 const typed = ref('')
 const inputEl = ref(null)
+const dialogEl = ref(null)
+let opener = null
 
+/* 焦点管理：打开时把焦点移进弹窗，关闭后还给「当初点开它的那个按钮」。
+   少了这一步，键盘 / 读屏用户关掉弹窗会掉回页面顶部，找不着北。 */
 watch(
   () => confirmState.value,
-  (s) => {
-    typed.value = ''
-    if (s?.requireText) nextTick(() => inputEl.value?.focus())
+  (s, prev) => {
+    if (s && !prev) {
+      typed.value = ''
+      opener = document.activeElement
+      nextTick(() => (s.requireText ? inputEl.value?.focus() : dialogEl.value?.focus()))
+    } else if (!s && prev) {
+      if (opener && typeof opener.focus === 'function' && document.contains(opener)) opener.focus()
+      opener = null
+    }
   }
 )
+
+/* Esc 关闭：role="dialog" 的弹窗，键盘用户理应能按 Esc 退出。 */
+function onKey(e) {
+  if (e.key === 'Escape' && confirmState.value) {
+    e.preventDefault()
+    resolveConfirm(false)
+  }
+}
+onMounted(() => window.addEventListener('keydown', onKey))
+onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
 
 const needText = computed(() => !!confirmState.value?.requireText)
 const matched = computed(() => !needText.value || typed.value.trim() === confirmState.value.requireText)
@@ -35,8 +55,16 @@ function confirm() {
   <Teleport to="body">
     <Transition name="fade">
       <div v-if="confirmState" class="mask no-print" @click.self="resolveConfirm(false)">
-        <div class="dlg panel" :class="{ danger: confirmState.danger }" role="dialog" aria-modal="true">
-          <h3 class="mb0 title">
+        <div
+          ref="dialogEl"
+          class="dlg panel"
+          :class="{ danger: confirmState.danger }"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="cfm-title"
+          tabindex="-1"
+        >
+          <h3 id="cfm-title" class="mb0 title">
             <span v-if="confirmState.danger" class="warn-mark">!</span>
             {{ confirmState.title }}
           </h3>
@@ -90,7 +118,7 @@ function confirm() {
   border-top: 3px solid transparent;
 }
 .dlg.danger {
-  border-top-color: #d14343;
+  border-top-color: var(--cinnabar-solid);
 }
 .title {
   display: flex;
@@ -104,9 +132,9 @@ function confirm() {
   width: 20px;
   height: 20px;
   border-radius: 50%;
-  background: #d14343;
+  background: var(--cinnabar-solid);
   color: #fff;
-  font-size: 0.78rem;
+  font-size: var(--fs-sm);
   font-weight: 700;
   flex-shrink: 0;
 }

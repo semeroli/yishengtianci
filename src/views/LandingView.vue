@@ -9,7 +9,7 @@
  *     大圆角药丸按钮、卡片用高度（阴影）分层而不是描边、大字号数字条、
  *     一屏一个主张、滚动节奏均匀。
  *   · 取自宋式美学的一面 —— 古纸底 / 墨色字 / 朱砂为记；标题走宋体、
- *     诗句走楷体；平仄用 ○●⊙ 而不是 ✗✓；朱砂印章既是图形也是品牌记号；
+ *     诗句走楷体；平仄用 ○●◐ 而不是 ✗✓；朱砂印章既是图形也是品牌记号；
  *     栏线、句读这些刻本里的东西被当成装饰线条复用。
  *
  * 一条硬规矩：**页面上出现的每一个数字和每一句样例词，都必须是真的。**
@@ -86,7 +86,7 @@ const STEPS = [
  * 图标统一 24×24、1.5 线宽、圆头端点，跟 Material 的线性图标同规格；
  * 图形本身用国风的意象（谱点、对勾、书、印章），不是通用齿轮 / 星星那一套。
  */
-const FEATURES = [
+const FEATURES = computed(() => [
   {
     title: '逐字校验平仄',
     body: '谱上写「○」的地方用了仄声字，会直接标出来。不是给你一句「写得不错」，而是逐字告诉你哪一处出了律。',
@@ -105,7 +105,7 @@ const FEATURES = [
   },
   {
     title: '按《词林正韵》归部',
-    body: '平声八部、仄声四部，韵字按韵书归部，入声字单独处理。选字时就知道它能不能押、押哪一部，不必自己翻书。',
+    body: `平声 ${RHYME_PING.value} 部、仄声 ${RHYME_ZE.value} 部，韵字按韵书归部，入声字单独处理。选字时就知道它能不能押、押哪一部，不必自己翻书。`,
     svg: `<path d="M12 6.4C9.9 4.4 6.6 3.8 3.6 4.4V19c3-.6 6.3 0 8.4 2 2.1-2 5.4-2.6 8.4-2V4.4c-3-.6-6.3 0-8.4 2z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M12 6.4V21" fill="none" stroke="currentColor" stroke-width="1.5"/>`
   },
   {
@@ -118,16 +118,21 @@ const FEATURES = [
     body: '满意的作品收进「词笺」随时翻看；也能生成一张竖排的词卡存下来或转给别人，题款、韵脚都在上面。',
     svg: `<rect x="3.8" y="3.5" width="16.4" height="17" rx="2" fill="none" stroke="currentColor" stroke-width="1.5"/><rect x="14" y="14" width="6.2" height="6.2" rx="1" fill="currentColor" opacity="0.9"/><path d="M7 8.5h8M7 12h5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>`
   }
-]
+])
 
 /* ═══════════════ 词牌（真实数据，接口取，失败才退回估算） ═══════════════ */
 const cipaiCount = ref(10)
 const cipaiExtra = ref(2)
 const cipaiChips = ref([])
 
-/** 韵部 / 韵字的口径来自 shared/rhyme.js（平 8 部、仄 4 部；去重后 1179 字，平仄无兼收） */
-const RHYME_PARTS = 12
-const RHYME_CHARS = 1179
+/** 韵部 / 韵字的口径**从接口现算**，不在前端写死 ——
+ *  上一轮把韵库从 12 部补到 20 部之后，页面上的数字还是旧的，等于对外说假话。
+ *  这四个默认值只是「接口没通时的兜底」，应等于当前真实值：
+ *  20 部（平 12 / 仄 8）、去重后 1599 个韵字。 */
+const RHYME_PARTS = ref(20)
+const RHYME_PING = ref(12)
+const RHYME_ZE = ref(8)
+const RHYME_CHARS = ref(1599)
 
 onMounted(async () => {
   setSeo({
@@ -146,6 +151,17 @@ onMounted(async () => {
     }
   } catch {
     /* 接口没通就保持默认值，页面照样完整 —— 落地页不该因为一个接口挂了就开天窗 */
+  }
+  try {
+    const { data } = await Api.rhyme()
+    if (data?.parts) {
+      RHYME_PARTS.value = data.parts
+      RHYME_PING.value = data.pingParts ?? RHYME_PING.value
+      RHYME_ZE.value = data.parts - RHYME_PING.value
+      RHYME_CHARS.value = data.totalChars ?? RHYME_CHARS.value
+    }
+  } catch {
+    /* 同上：韵书接口不通就用内置默认值，但仍然是对的 */
   }
 })
 
@@ -240,7 +256,7 @@ const totalSyllables = computed(() => SAMPLE.lines.reduce((n, l) => n + [...l.te
         <div class="lp-stat">
           <b class="tabnum">{{ RHYME_PARTS }}</b>
           <span>个韵部</span>
-          <em>平声八部 · 仄声四部</em>
+          <em>平声 {{ RHYME_PING }} 部 · 仄声 {{ RHYME_ZE }} 部</em>
         </div>
         <div class="lp-stat">
           <b class="tabnum">{{ RHYME_CHARS }}</b>
@@ -501,7 +517,7 @@ const totalSyllables = computed(() => SAMPLE.lines.reduce((n, l) => n + [...l.te
   transition: transform var(--t) var(--ease-ink), box-shadow var(--t), background var(--t), border-color var(--t);
 }
 .lp-btn-primary {
-  background: var(--cinnabar);
+  background: var(--cinnabar-solid);
   color: #fff;
   box-shadow: 0 1px 2px rgba(150, 40, 40, 0.24), 0 10px 24px -10px rgba(150, 40, 40, 0.55);
 }
@@ -559,7 +575,7 @@ const totalSyllables = computed(() => SAMPLE.lines.reduce((n, l) => n + [...l.te
   border: 1px solid color-mix(in srgb, var(--cinnabar) 30%, transparent);
   background: color-mix(in srgb, var(--cinnabar) 7%, transparent);
   color: var(--cinnabar);
-  font-size: 0.78rem;
+  font-size: var(--fs-sm);
   letter-spacing: 0.2em;
   text-indent: 0.2em;
 }
@@ -625,7 +641,7 @@ const totalSyllables = computed(() => SAMPLE.lines.reduce((n, l) => n + [...l.te
   width: 5px;
   height: 5px;
   border-radius: 50%;
-  background: var(--cinnabar);
+  background: var(--cinnabar-solid);
   opacity: 0.6;
 }
 
@@ -693,7 +709,7 @@ const totalSyllables = computed(() => SAMPLE.lines.reduce((n, l) => n + [...l.te
   color: var(--ink);
 }
 .lp-card-title span {
-  font-size: 0.76rem;
+  font-size: var(--fs-xs);
   color: var(--ink-3);
   letter-spacing: 0.04em;
 }
@@ -706,7 +722,7 @@ const totalSyllables = computed(() => SAMPLE.lines.reduce((n, l) => n + [...l.te
   border-radius: var(--r-pill);
   background: color-mix(in srgb, var(--moss) 14%, transparent);
   color: var(--moss);
-  font-size: 0.72rem;
+  font-size: var(--fs-xs);
   letter-spacing: 0.04em;
 }
 
@@ -741,7 +757,7 @@ const totalSyllables = computed(() => SAMPLE.lines.reduce((n, l) => n + [...l.te
    等于承诺了产品其实没有的东西。 */
 .lp-cell i {
   font-style: normal;
-  font-size: 0.62rem;
+  font-size: var(--fs-xs);
   line-height: 1;
   margin-top: 2px;
   color: var(--ink-3);
@@ -757,14 +773,14 @@ const totalSyllables = computed(() => SAMPLE.lines.reduce((n, l) => n + [...l.te
   gap: 5px;
   padding-top: 12px;
   border-top: 1px solid var(--line);
-  font-size: 0.8rem;
+  font-size: var(--fs-sm);
   color: var(--ink-3);
   line-height: 1.7;
 }
 .lp-card-foot em {
   font-style: normal;
   margin-right: 8px;
-  color: var(--ink-4);
+  color: var(--ink-3);
   letter-spacing: 0.1em;
 }
 .lp-rhy {
@@ -776,9 +792,9 @@ const totalSyllables = computed(() => SAMPLE.lines.reduce((n, l) => n + [...l.te
 }
 .lp-card-tip {
   margin-top: 11px;
-  font-size: 0.72rem;
+  font-size: var(--fs-xs);
   line-height: 1.7;
-  color: var(--ink-4);
+  color: var(--ink-3);
 }
 
 /* ═══════════ ② 数字条 ═══════════ */
@@ -821,8 +837,8 @@ const totalSyllables = computed(() => SAMPLE.lines.reduce((n, l) => n + [...l.te
 }
 .lp-stat em {
   font-style: normal;
-  font-size: 0.75rem;
-  color: var(--ink-4);
+  font-size: var(--fs-xs);
+  color: var(--ink-3);
 }
 
 /* ═══════════ ③ 三步 ═══════════ */
@@ -876,8 +892,8 @@ const totalSyllables = computed(() => SAMPLE.lines.reduce((n, l) => n + [...l.te
   padding-top: 10px;
   border-top: 1px dashed var(--line-strong);
   width: 100%;
-  font-size: 0.8rem;
-  color: var(--ink-4);
+  font-size: var(--fs-sm);
+  color: var(--ink-3);
 }
 
 /* ═══════════ ④ 能力 ═══════════ */
@@ -992,8 +1008,8 @@ const totalSyllables = computed(() => SAMPLE.lines.reduce((n, l) => n + [...l.te
   color: var(--ink);
 }
 .lp-demo-head span {
-  font-size: 0.74rem;
-  color: var(--ink-4);
+  font-size: var(--fs-xs);
+  color: var(--ink-3);
   letter-spacing: 0.16em;
 }
 .lp-demo-row {
@@ -1005,8 +1021,8 @@ const totalSyllables = computed(() => SAMPLE.lines.reduce((n, l) => n + [...l.te
 .lp-demo-lb {
   flex-shrink: 0;
   width: 3.2em;
-  font-size: 0.76rem;
-  color: var(--ink-4);
+  font-size: var(--fs-xs);
+  color: var(--ink-3);
   letter-spacing: 0.12em;
 }
 .lp-demo-cells {
@@ -1075,9 +1091,9 @@ const totalSyllables = computed(() => SAMPLE.lines.reduce((n, l) => n + [...l.te
   margin: 16px 0 0;
   padding-top: 13px;
   border-top: 1px dashed var(--line-strong);
-  font-size: 0.78rem;
+  font-size: var(--fs-sm);
   line-height: 1.85;
-  color: var(--ink-4);
+  color: var(--ink-3);
 }
 
 /* ═══════════ ⑥ 词牌 ═══════════ */
@@ -1113,8 +1129,8 @@ const totalSyllables = computed(() => SAMPLE.lines.reduce((n, l) => n + [...l.te
   letter-spacing: 0.08em;
 }
 .lp-chip span {
-  font-size: 0.72rem;
-  color: var(--ink-4);
+  font-size: var(--fs-xs);
+  color: var(--ink-3);
   letter-spacing: 0.02em;
 }
 .lp-chips-note {
@@ -1123,7 +1139,7 @@ const totalSyllables = computed(() => SAMPLE.lines.reduce((n, l) => n + [...l.te
   text-align: center;
   font-size: 0.82rem;
   line-height: 1.9;
-  color: var(--ink-4);
+  color: var(--ink-3);
 }
 
 /* ═══════════ ⑦ 结尾 ═══════════ */
@@ -1232,7 +1248,7 @@ const totalSyllables = computed(() => SAMPLE.lines.reduce((n, l) => n + [...l.te
   }
   .lp-demo-lb {
     width: 2.7em;
-    font-size: 0.7rem;
+    font-size: var(--fs-xs);
   }
   .lp-demo-cells i {
     width: 1.78rem;

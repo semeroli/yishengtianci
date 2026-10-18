@@ -374,8 +374,12 @@ npm run deploy        # = vite build && wrangler pages deploy dist
 | 命令 | 作用 |
 |---|---|
 | `npm run dev` | 开发服务器（HMR，单端口 5173） |
-| `npm run build` | 生产构建。**它比开发服务器严——Vue 模板里的错误只有构建才报**，提交前跑一次 |
+| `npm run build` | 生产构建 = `vite build` + **预渲染**（见第十一节）。**它比开发服务器严——Vue 模板里的错误只有构建才报**，提交前跑一次 |
+| `npm run build:spa` | 只跑 `vite build`，不做预渲染（排查"是不是预渲染把页面弄坏了"时用） |
 | `npm run preview` | 构建 + 用 dist 起服务，验证生产形态 |
+| `npm run prerender` | 只重跑预渲染（改完文案后不用重新打包前端时用） |
+| `npm run verify:prerender` | **站在爬虫角度验收**：不发一个 JS，只用 fetch 拿页面，验正文在不在、路由规则对不对、未知地址是否真 404（74 项） |
+| `npm run verify:prerender -- --serve` | 同上，验完留一个预览地址，用浏览器看看"部署出去长什么样" |
 | `npm run seed` | 灌示范数据 / 建管理员（`-- --admin=me --pwd=xxxx` 可换账号）。**仅本地**，线上建管理员用下一行 |
 | `npm run gen-admin` | 生成线上管理员的初始化 SQL（见第五节第 2 步），输出一行可直接粘进 D1 控制台的 `INSERT` |
 | `npm run test:engine` | 填词引擎回归自测（110 项） |
@@ -511,3 +515,135 @@ npm run seed -- --admin=me --pwd=新密码
 - **`npm run shots:admin` 需要能登录的后台账号**，默认读 `admin / yisheng2026`。
   线上改过密码后要带环境变量：
   `YS_USER=你的账号 YS_PWD=你的密码 npm run shots:admin`。
+
+---
+
+## 十一、预渲染与搜索引擎收录（SEO）
+
+### 11.1 一句话结论
+
+`npm run build` 现在会**顺手把 6 个页面渲染成静态 HTML**（`dist/studio.html` 等），
+所以百度、谷歌这类爬虫**不用执行 JS 也能读到完整正文**。
+
+### 11.2 为什么非做不可
+
+本站是"单页应用"：服务器上的 `index.html` 里只有一个空壳
+
+```html
+<div id="app"></div>
+```
+
+正文全靠浏览器执行 JS 才出现。于是：
+
+- 谷歌**能**执行 JS，但要排队，收录慢；
+- **百度基本不执行 JS** —— 它爬到的是一个空页面，判定"无正文"，**不收录**。
+
+预渲染就是在构建完成后，真的用 Chrome 把页面打开、渲染一遍，
+把渲染出来的完整 HTML 存成静态文件。爬虫拿到的就不再是空壳。
+
+### 11.3 它怎么跑的
+
+```
+vite build            → dist/index.html（空壳）+ assets/
+  ↓
+node scripts/prerender.mjs
+  · 起一个临时静态服务，托管 dist
+  · 用 Chrome 逐页打开 / /studio /blog /rhyme /about /favorites
+  · 等正文稳定 + 网络安静 → 把 <html> 整个抄下来
+  · 把 127.0.0.1 换成规范域（canonical / og:url 由 seo.js 的 SITE_ORIGIN 统一给出）
+  · 写回 dist/studio.html、dist/blog.html …
+  ↓
+dist/ 里同时有：空壳 index.html（首页已换成渲染版）、6 个渲染页、404.html、_redirects
+```
+
+`public/_redirects` 负责把地址接到这些文件上：
+
+```
+/studio    /studio.html    200      ← 精确匹配，带不带斜杠都指同一个文件
+/blog/*    /index.html     200      ← 文章详情仍交给前端（文章是后加的，构建时不一定在）
+```
+
+### 11.4 三个已经踩过的坑（改这块之前务必看）
+
+1. **重定向永远优先于静态文件。** Cloudflare 官方原文：
+   *"Redirects are always followed, regardless of whether or not an asset matches
+   the incoming request."*
+   旧的 `/* /index.html 200` 通配会把刚生成的 `studio.html` 一起盖掉 ——
+   **不删这条通配，预渲染等于白做**。
+2. **重写目标不能落进后面的通配范围。** 所以产物是 `dist/blog.html`，
+   而不是 `dist/blog/index.html`：后者的路径同时落在 `/blog/*` 的范围里，
+   一旦平台把重写目标再过一遍规则，正文就会被空壳顶掉。
+3. **canonical 必须是绝对地址，而且只能有一个。** 规范域的**唯一真相**是
+   `src/utils/seo.js` 里的 `SITE_ORIGIN`（当前 `https://ystianci.de5.net`）。
+   预渲染是从 `127.0.0.1` 打开的，脚本最后一步还会把整串本机 origin 替换掉，作为第二道保险。
+
+> ⚠️ 本站现在有**三个域名**同时能打开：
+> `https://ystianci.de5.net`（规范域）、`https://ystianci.kdns.fr`、
+> `https://yishengtianci.pages.dev`。
+> 三个都能访问，但 canonical 一律声明 de5.net —— 否则等于告诉搜索引擎
+> 「这是三份不同内容」，权重被自己摊薄。
+> **换主域名只改一处**：`src/utils/seo.js` 的 `SITE_ORIGIN`
+> （外加 `scripts/prerender.mjs` / `scripts/verify-prerender.mjs` 的默认值，保持一致）。
+>
+> 更彻底的做法是在 Cloudflare 上把另外两个域名 **301 跳到规范域**——
+> 但 `_redirects` 做不到「按域名分流」，得用控制台的 Redirect Rules（见 11.8）。
+>
+> ⚠️ 域名**实测过**，不要照项目名去猜：`wrangler.toml` 里项目叫 `yisheng`，
+> 但 `yisheng.pages.dev` 是别人占着的（会 301 跳到 cctv.com）。
+
+### 11.5 怎么验收
+
+```bash
+npm run build
+npm run verify:prerender        # 74 项：正文在不在、规则对不对、未知地址是否真 404
+npm run verify:prerender -- --serve   # 再看一眼"部署出去长什么样"
+```
+
+这个脚本**不发一个 JS**，只用 `fetch` 把页面拿下来检查 —— 它看到什么，爬虫就大致看到什么。
+用浏览器打开是看不出问题的（浏览器本来就执行 JS）。
+
+另外它顺带修掉了一个老毛病：旧配置下**任何不存在的网址都返回 200 + 首页**（软 404），
+搜索引擎会把一堆垃圾地址当正常页面收录。现在没有通配兜底了，未知地址返回**真 404** + `dist/404.html`。
+
+### 11.6 站上已有文章时，让列表也进静态
+
+默认构建**不连线上**（断网也要能构建；而且构建时抄下来的线上数据是一份快照，
+容易过期）。所以 `/blog` 的静态版是"共 0 篇"的空状态。
+站上有文章后想把它写进静态文件：
+
+```bash
+YS_API=https://yishengtianci.pages.dev npm run prerender
+```
+
+它会先从线上 `/api/posts` 取真数据再渲染。取不到就自动退回空状态，不会失败。
+
+### 11.7 已知取舍
+
+- **`/blog` 首屏会闪一下空状态**：静态文件里是空列表，浏览器里 Vue 起来后才拉到真文章。
+  爬虫看到的就是静态那份（诚实，但不含文章列表）。
+- **文章详情页 `/blog/某篇` 仍是前端渲染**，没有被预渲染。
+  要让每篇文章也有静态正文，得在构建时把文章列表拉下来逐篇渲染并生成对应规则，
+  属于下一步的事（`YS_API` 已经打通了取数据这一环）。
+- **预渲染失败不会让构建失败**：某个页面渲染不出来时，脚本会把空壳复制过去并打印警告
+  —— 宁可退回旧行为（用户能正常打开，只是爬虫读不到），也不能让那一页 404。
+  想让失败直接报错就加 `--strict`。
+
+### 11.8 三个域名怎么收成一个（建议做，但得在控制台点）
+
+`canonical` 已经把「正版在哪个域名」讲清楚了，搜索引擎会自己合并。但**更干净**的做法是
+让另外两个域名 **301** 到规范域，用户和爬虫都不会走到重复副本上：
+
+1. Cloudflare 控制台 → 选中 `de5.net`（或 `kdns.fr`）这个**站点**（不是 Pages 项目）
+   → **Rules → Redirect Rules → Create rule**。
+2. 匹配条件（以 kdns.fr 为例）：
+   - **When incoming requests match** → Custom filter expression
+   - `Hostname` `equals` `ystianci.kdns.fr`
+3. **Then** → *Static* → URL `https://ystianci.de5.net/`，**Status code: 301**，勾选
+   *Preserve query string*（保留 `?category=` 这类参数，否则分享出去的筛选链接会失效）。
+4. `yishengtianci.pages.dev` 同理再加一条。Pages 项目里的 *Custom domains* 也可以把
+   非主域名删掉（删了就不解析了，更省事，但会丢掉已收录的旧链接，所以优先用 301）。
+
+> `public/_redirects` **做不到这件事**：它只按「路径」匹配，不看域名 ——
+> 写 `/ → https://ystianci.de5.net/` 会把规范域自己首页也跳一圈。
+
+

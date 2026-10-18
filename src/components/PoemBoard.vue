@@ -279,10 +279,10 @@ const engineLabel = computed(() => {
   transition: color var(--t), text-shadow var(--t);
 }
 .char-cell .mark {
-  font-size: 0.6rem;
+  font-size: var(--fs-xs);
   line-height: 1;
   margin-top: 2px;
-  color: var(--ink-4);
+  color: var(--ink-3);
   font-family: var(--font-mono);
 }
 .char-cell .mark.ping {
@@ -339,7 +339,7 @@ const engineLabel = computed(() => {
   background: var(--paper-2);
   color: var(--ink-2);
   border-radius: var(--r);
-  font-size: 0.72rem;
+  font-size: var(--fs-xs);
   padding: 2px 7px;
   cursor: pointer;
   white-space: nowrap;
@@ -384,7 +384,7 @@ const engineLabel = computed(() => {
 }
 .dotk {
   font-style: normal;
-  font-size: 0.72rem;
+  font-size: var(--fs-xs);
   padding: 0 4px;
   border: 1px solid var(--line-strong);
   border-radius: 3px;

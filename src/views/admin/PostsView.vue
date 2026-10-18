@@ -332,8 +332,8 @@ onMounted(() => {
 
     <AdminModal :open="catModal.open" title="批量修改分类" @close="catModal.open = false">
       <div class="adm-field">
-        <label>目标分类</label>
-        <select v-model="catModal.value" class="select">
+        <label for="pv-cat-select">目标分类</label>
+        <select id="pv-cat-select" v-model="catModal.value" class="select">
           <option v-for="c in categories" :key="c.id" :value="c.name">{{ c.name }}</option>
         </select>
       </div>

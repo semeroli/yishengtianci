@@ -193,7 +193,7 @@ svg {
 .yl,
 .xl {
   fill: var(--a-text-3);
-  font-size: 11px;
+  font-size: var(--fs-xs);
   font-family: var(--a-font-mono);
 }
 .xl {
@@ -224,7 +224,7 @@ svg {
   border: 1px solid var(--a-line);
   border-radius: var(--a-radius);
   padding: 4px 10px;
-  font-size: 0.8rem;
+  font-size: var(--fs-sm);
   display: flex;
   align-items: baseline;
   gap: 6px;
@@ -234,13 +234,13 @@ svg {
 .tip .d {
   color: var(--a-text-3);
   font-family: var(--a-font-mono);
-  font-size: 0.74rem;
+  font-size: var(--fs-xs);
 }
 .tip b {
   font-variant-numeric: tabular-nums;
 }
 .tip .u {
   color: var(--a-text-3);
-  font-size: 0.72rem;
+  font-size: var(--fs-xs);
 }
 </style>

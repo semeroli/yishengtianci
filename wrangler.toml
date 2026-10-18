@@ -45,3 +45,10 @@ AI_BASE_URL = "https://api-inference.modelscope.cn/v1"
 AI_MODEL = "Qwen/Qwen3.8-Flash-Next"
 AI_DISABLE_THINKING = "1"
 AI_TIMEOUT_MS = "45000"
+
+# 站点规范域名（非密钥，属正常配置）。
+# 作用：/sitemap.xml 与 /robots.txt 里只写这一个域名，不管请求是从哪个域名进来的。
+# 本站现在三个域名同时可访问（ystianci.de5.net / ystianci.kdns.fr /
+# yishengtianci.pages.dev），若按请求域名生成，搜索引擎会拿到三套地址。
+# ⚠️ 与 src/utils/seo.js 的 SITE_ORIGIN 保持一致，换主域名时两处一起改。
+SITE_ORIGIN = "https://ystianci.de5.net"

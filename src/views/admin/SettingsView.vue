@@ -269,54 +269,54 @@ onMounted(async () => {
       <div class="adm-card-head"><h3>博客外观与信息</h3></div>
       <div class="adm-card-body maxw">
         <div class="adm-field">
-          <label>博客名称</label>
-          <input v-model="settings.site_name" class="input" type="text" placeholder="倚声 · AI填词工坊" />
+          <label for="set-site-name">博客名称</label>
+          <input id="set-site-name" v-model="settings.site_name" class="input" type="text" placeholder="倚声 · AI填词工坊" />
         </div>
         <div class="adm-field">
-          <label>博客描述</label>
-          <textarea v-model="settings.site_desc" class="textarea" rows="2" maxlength="200"></textarea>
+          <label for="set-site-desc">博客描述</label>
+          <textarea id="set-site-desc" v-model="settings.site_desc" class="textarea" rows="2" maxlength="200"></textarea>
         </div>
         <div class="grid2">
           <div class="adm-field">
-            <label>Logo（emoji 或图片地址）</label>
-            <input v-model="settings.logo" class="input" type="text" placeholder="留空 = 朱砂方印「倚」" />
+            <label for="set-logo">Logo（emoji 或图片地址）</label>
+            <input id="set-logo" v-model="settings.logo" class="input" type="text" placeholder="留空 = 朱砂方印「倚」" />
             <p class="hint">留空时顶栏与页脚显示朱砂方印「倚」（与浏览器标签图标同一枚记号）。想换成别的 emoji 或图片，填这里即可。</p>
           </div>
           <div class="adm-field">
-            <label>Favicon 地址</label>
-            <input v-model="settings.favicon" class="input" type="text" placeholder="/favicon.svg" />
+            <label for="set-favicon">Favicon 地址</label>
+            <input id="set-favicon" v-model="settings.favicon" class="input" type="text" placeholder="/favicon.svg" />
             <p class="hint">留空时用站点自带的全套图标（SVG / ICO / PNG / apple-touch-icon）。</p>
           </div>
         </div>
         <div class="adm-field">
-          <label>首页 SEO 标题</label>
-          <input v-model="settings.seo_title" class="input" type="text" maxlength="80" placeholder="显示在搜索结果里的标题" />
+          <label for="set-seo-title">首页 SEO 标题</label>
+          <input id="set-seo-title" v-model="settings.seo_title" class="input" type="text" maxlength="80" placeholder="显示在搜索结果里的标题" />
         </div>
         <div class="adm-field">
-          <label>SEO 描述</label>
-          <textarea v-model="settings.seo_desc" class="textarea" rows="2" maxlength="200" placeholder="一句话说明这个站点是做什么的"></textarea>
+          <label for="set-seo-desc">SEO 描述</label>
+          <textarea id="set-seo-desc" v-model="settings.seo_desc" class="textarea" rows="2" maxlength="200" placeholder="一句话说明这个站点是做什么的"></textarea>
         </div>
         <div class="grid2">
           <div class="adm-field">
-            <label>GitHub</label>
-            <input v-model="settings.social_github" class="input" type="text" placeholder="https://github.com/..." />
+            <label for="set-social-github">GitHub</label>
+            <input id="set-social-github" v-model="settings.social_github" class="input" type="text" placeholder="https://github.com/..." />
           </div>
           <div class="adm-field">
-            <label>微博</label>
-            <input v-model="settings.social_weibo" class="input" type="text" placeholder="https://weibo.com/..." />
+            <label for="set-social-weibo">微博</label>
+            <input id="set-social-weibo" v-model="settings.social_weibo" class="input" type="text" placeholder="https://weibo.com/..." />
           </div>
         </div>
         <div class="adm-field">
-          <label>页脚版权</label>
-          <input v-model="settings.copyright" class="input" type="text" placeholder="© 倚声 · AI填词工坊" />
+          <label for="set-copyright">页脚版权</label>
+          <input id="set-copyright" v-model="settings.copyright" class="input" type="text" placeholder="© 倚声 · AI填词工坊" />
         </div>
         <div class="adm-field">
-          <label>页脚小字</label>
-          <input v-model="settings.footer_note" class="input" type="text" placeholder="倚声填词，以韵为骨。" />
+          <label for="set-footer-note">页脚小字</label>
+          <input id="set-footer-note" v-model="settings.footer_note" class="input" type="text" placeholder="倚声填词，以韵为骨。" />
         </div>
         <div class="adm-field">
-          <label>评论审核策略</label>
-          <select v-model="settings.comment_moderation" class="select">
+          <label for="set-comment-moderation">评论审核策略</label>
+          <select id="set-comment-moderation" v-model="settings.comment_moderation" class="select">
             <option value="auto">自动通过（命中敏感词的才转待审）</option>
             <option value="manual">全部人工审核</option>
           </select>
@@ -353,20 +353,20 @@ onMounted(async () => {
         <div class="adm-card-head"><h3>修改密码</h3></div>
         <div class="adm-card-body">
           <div class="adm-field">
-            <label>原密码</label>
-            <input v-model="pwd.oldPassword" class="input" type="password" autocomplete="current-password" />
+            <label for="set-pwd-old">原密码</label>
+            <input id="set-pwd-old" v-model="pwd.oldPassword" class="input" type="password" autocomplete="current-password" />
           </div>
           <div class="adm-field">
-            <label>新密码</label>
-            <input v-model="pwd.newPassword" class="input" type="password" autocomplete="new-password" />
+            <label for="set-pwd-new">新密码</label>
+            <input id="set-pwd-new" v-model="pwd.newPassword" class="input" type="password" autocomplete="new-password" />
             <div class="strength" :class="'lv' + pwdStrength.level">
               <i :style="{ width: pwdStrength.level * 20 + '%' }"></i>
             </div>
             <p class="tiny" style="color: var(--a-text-3); margin: 4px 0 0">{{ pwdStrength.text }} · 至少 8 位</p>
           </div>
           <div class="adm-field">
-            <label>确认新密码</label>
-            <input v-model="pwd.confirmPassword" class="input" type="password" autocomplete="new-password" />
+            <label for="set-pwd-confirm">确认新密码</label>
+            <input id="set-pwd-confirm" v-model="pwd.confirmPassword" class="input" type="password" autocomplete="new-password" />
           </div>
           <p v-if="pwdErr" class="err" style="color: var(--a-danger); font-size: 0.82rem">{{ pwdErr }}</p>
           <button class="btn primary" type="button" :disabled="pwdBusy" @click="changePassword">
@@ -390,8 +390,9 @@ onMounted(async () => {
             </p>
             <template v-if="totp.confirmOff">
               <div class="adm-field">
-                <label>输入登录密码以确认关闭</label>
+                <label for="set-totp-off-pwd">输入登录密码以确认关闭</label>
                 <input
+                  id="set-totp-off-pwd"
                   v-model="totp.offPwd"
                   class="input"
                   type="password"
@@ -421,8 +422,8 @@ onMounted(async () => {
               <button class="adm-act" type="button" @click="copyText(totp.otpauth, '链接')">复制链接</button>
             </details>
             <div class="adm-field mt2">
-              <label>输入 App 里显示的 6 位验证码以确认</label>
-              <input v-model="totp.code" class="input mono" type="text" inputmode="numeric" maxlength="6" placeholder="000000" />
+              <label for="set-totp-code">输入 App 里显示的 6 位验证码以确认</label>
+              <input id="set-totp-code" v-model="totp.code" class="input mono" type="text" inputmode="numeric" maxlength="6" placeholder="000000" />
             </div>
             <button class="btn primary" type="button" :disabled="totp.busy || totp.code.length !== 6" @click="confirmTotp">
               确认开启

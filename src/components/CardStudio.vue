@@ -556,7 +556,7 @@ function openInNewTab() {
   align-items: start;
 }
 .lbl {
-  font-size: 0.78rem;
+  font-size: var(--fs-sm);
   color: var(--ink-3);
   margin-bottom: 6px;
   letter-spacing: 0.08em;

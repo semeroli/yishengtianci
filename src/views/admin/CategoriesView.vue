@@ -191,20 +191,20 @@ onMounted(load)
     <!-- 分类弹窗 -->
     <AdminModal :open="catForm.open" :title="catForm.isNew ? '新建分类' : '编辑分类'" @close="catForm.open = false">
       <div class="adm-field">
-        <label>名称 *</label>
-        <input v-model="catForm.name" class="input" type="text" placeholder="例如：填词教程" maxlength="30" />
+        <label for="cat-name">名称 *</label>
+        <input id="cat-name" v-model="catForm.name" class="input" type="text" placeholder="例如：填词教程" maxlength="30" />
       </div>
       <div class="adm-field">
-        <label>别名（slug，用于地址栏）</label>
-        <input v-model="catForm.slug" class="input mono" type="text" placeholder="例如：tutorial" />
+        <label for="cat-slug">别名（slug，用于地址栏）</label>
+        <input id="cat-slug" v-model="catForm.slug" class="input mono" type="text" placeholder="例如：tutorial" />
       </div>
       <div class="adm-field">
-        <label>描述</label>
-        <textarea v-model="catForm.description" class="textarea" rows="3" placeholder="一句话说明这个分类收什么内容" maxlength="200"></textarea>
+        <label for="cat-desc">描述</label>
+        <textarea id="cat-desc" v-model="catForm.description" class="textarea" rows="3" placeholder="一句话说明这个分类收什么内容" maxlength="200"></textarea>
       </div>
       <div class="adm-field">
-        <label>排序权重（越大越靠前）</label>
-        <input v-model="catForm.sortOrder" class="input" type="number" />
+        <label for="cat-sort">排序权重（越大越靠前）</label>
+        <input id="cat-sort" v-model="catForm.sortOrder" class="input" type="number" />
       </div>
       <p v-if="catErr" class="err" style="color: var(--a-danger); font-size: 0.82rem">{{ catErr }}</p>
       <p class="tiny" style="color: var(--a-text-3)">改名后，原本用旧名字的文章会一起跟着改。</p>
@@ -217,12 +217,12 @@ onMounted(load)
     <!-- 标签弹窗 -->
     <AdminModal :open="tagForm.open" :title="tagForm.isNew ? '新建标签' : '编辑标签'" @close="tagForm.open = false">
       <div class="adm-field">
-        <label>名称 *</label>
-        <input v-model="tagForm.name" class="input" type="text" placeholder="例如：格律" maxlength="20" />
+        <label for="tag-name">名称 *</label>
+        <input id="tag-name" v-model="tagForm.name" class="input" type="text" placeholder="例如：格律" maxlength="20" />
       </div>
       <div class="adm-field">
-        <label>别名（slug）</label>
-        <input v-model="tagForm.slug" class="input mono" type="text" placeholder="例如：gelv" />
+        <label for="tag-slug">别名（slug）</label>
+        <input id="tag-slug" v-model="tagForm.slug" class="input mono" type="text" placeholder="例如：gelv" />
       </div>
       <p v-if="tagErr" style="color: var(--a-danger); font-size: 0.82rem">{{ tagErr }}</p>
       <template #foot>

@@ -11,7 +11,7 @@ const props = defineProps({
 </script>
 
 <template>
-  <div class="hero" :style="{ height: props.height + 'px' }" aria-hidden="true">
+  <div class="hero" :style="{ '--hero-h': props.height + 'px' }" aria-hidden="true">
     <div class="hero-inner parallax-slow" :style="{ transform: `translateY(${props.parallax}px)` }">
       <svg viewBox="0 0 1200 320" preserveAspectRatio="xMidYMax slice" class="hero-svg">
         <defs>
@@ -79,6 +79,10 @@ const props = defineProps({
 .hero {
   position: relative;
   width: 100%;
+  /* 高度走自定义属性：桌面端保持传入值，移动端由媒体查询接管。
+     ⚠️ 不能把 height 直接写成内联 style —— 内联优先级高于 scoped 样式表，
+     那样移动端的覆盖规则会失效。 */
+  height: var(--hero-h, 260px);
   overflow: hidden;
   pointer-events: none;
   /* 入场：水墨晕染扩散 */
@@ -100,7 +104,9 @@ const props = defineProps({
   left: 0;
   right: 0;
   bottom: 0;
-  height: 70px;
+  /* 按比例而不是写死 70px —— 移动端横幅压矮后，渐变也要跟着变短，
+     否则 70px 的渐隐会吃掉大半个山影。27% 在桌面端正好还是 70px。 */
+  height: 27%;
   background: linear-gradient(to bottom, transparent, var(--paper) 92%);
 }
 .boat {
@@ -117,6 +123,16 @@ const props = defineProps({
 @media (prefers-reduced-motion: reduce) {
   .boat {
     animation: none;
+  }
+}
+
+/* 移动端：装饰性横幅不该霸占首屏。
+   390×844 实测（2026-10-15）：260px 时页面标题落在视口 44%、输入区落在 59%，
+   用户第一眼看到的是山，不是「这里能做什么」。压到 172px 后标题升到约 34%、
+   输入区约 48%，首屏就能看清输入框。桌面端保持传入高度不变。 */
+@media (max-width: 640px) {
+  .hero {
+    height: min(172px, 44vw);
   }
 }
 </style>

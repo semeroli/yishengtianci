@@ -406,12 +406,13 @@ const savedHint = computed(() => {
           <div class="adm-card-head"><h3>发布设置</h3></div>
           <div class="adm-card-body">
             <div class="adm-field">
-              <label>状态</label>
-              <div class="adm-seg" style="width: 100%">
+              <label id="pe-status-label">状态</label>
+              <div class="adm-seg" style="width: 100%" role="group" aria-labelledby="pe-status-label">
                 <button
                   type="button"
                   style="flex: 1"
                   :class="{ on: form.status === 'draft' }"
+                  :aria-pressed="form.status === 'draft'"
                   @click="form.status = 'draft'"
                 >
                   草稿
@@ -420,6 +421,7 @@ const savedHint = computed(() => {
                   type="button"
                   style="flex: 1"
                   :class="{ on: form.status === 'published' }"
+                  :aria-pressed="form.status === 'published'"
                   @click="form.status = 'published'"
                 >
                   已发布
@@ -428,14 +430,14 @@ const savedHint = computed(() => {
             </div>
 
             <div class="adm-field">
-              <label>分类</label>
-              <select v-model="form.category" class="select">
+              <label for="pe-category">分类</label>
+              <select id="pe-category" v-model="form.category" class="select">
                 <option v-for="c in categories" :key="c.id + c.name" :value="c.name">{{ c.name }}</option>
               </select>
             </div>
 
             <div class="adm-field">
-              <label>标签（最多 10 个）</label>
+              <label for="pe-tag-input">标签（最多 10 个）</label>
               <div class="tags">
                 <span v-for="t in form.tags" :key="t" class="tag-pill">
                   {{ t }}
@@ -444,6 +446,7 @@ const savedHint = computed(() => {
               </div>
               <div class="tag-add">
                 <input
+                  id="pe-tag-input"
                   v-model="tagInput"
                   class="input"
                   type="text"
@@ -455,8 +458,8 @@ const savedHint = computed(() => {
               </div>
             </div>
 
-            <div class="adm-field">
-              <label>封面图</label>
+            <div class="adm-field" role="group" aria-labelledby="pe-cover-label">
+              <label id="pe-cover-label">封面图</label>
               <div v-if="form.cover_image" class="cover">
                 <img :src="form.cover_image" alt="封面预览" />
                 <div class="cover-act">
@@ -471,8 +474,8 @@ const savedHint = computed(() => {
             </div>
 
             <div class="adm-field">
-              <label>摘要 <span class="tiny" style="color: var(--a-text-3)">（列表页 / 分享卡片显示）</span></label>
-              <textarea v-model="form.excerpt" class="textarea" rows="3" maxlength="200" placeholder="留空会从正文自动截取"></textarea>
+              <label for="pe-excerpt">摘要 <span class="tiny" style="color: var(--a-text-3)">（列表页 / 分享卡片显示）</span></label>
+              <textarea id="pe-excerpt" v-model="form.excerpt" class="textarea" rows="3" maxlength="200" placeholder="留空会从正文自动截取"></textarea>
               <div class="row between">
                 <button class="adm-act" type="button" @click="fillExcerpt">从正文生成</button>
                 <span class="tiny" style="color: var(--a-text-3)">{{ form.excerpt.length }} / 200</span>
@@ -480,10 +483,22 @@ const savedHint = computed(() => {
             </div>
 
             <div class="adm-field">
-              <label>发布时间</label>
-              <div class="dt">
-                <input v-model="form.publishedDate" class="input" type="date" />
-                <input v-model="form.publishedTime" class="input" type="time" />
+              <label id="pe-pub-label">发布时间</label>
+              <div class="dt" role="group" aria-labelledby="pe-pub-label">
+                <input
+                  id="pe-pub-date"
+                  v-model="form.publishedDate"
+                  class="input"
+                  type="date"
+                  aria-label="发布日期"
+                />
+                <input
+                  id="pe-pub-time"
+                  v-model="form.publishedTime"
+                  class="input"
+                  type="time"
+                  aria-label="发布时间"
+                />
               </div>
               <p class="tiny" style="color: var(--a-text-3); margin: 4px 0 0">
                 留空则发布时自动记为「现在」。
@@ -515,7 +530,7 @@ const savedHint = computed(() => {
   gap: 6px;
   align-items: center;
   color: var(--a-text-3);
-  font-size: 0.76rem;
+  font-size: var(--fs-xs);
   margin-top: 8px;
   font-variant-numeric: tabular-nums;
 }
@@ -533,7 +548,7 @@ const savedHint = computed(() => {
   border: 1px solid var(--a-line);
   border-radius: var(--a-radius);
   background: var(--a-card-2);
-  font-size: 0.78rem;
+  font-size: var(--fs-sm);
   color: var(--a-text-2);
 }
 .tag-pill button {
@@ -541,7 +556,7 @@ const savedHint = computed(() => {
   background: transparent;
   color: var(--a-text-3);
   cursor: pointer;
-  font-size: 0.7rem;
+  font-size: var(--fs-xs);
   padding: 0;
   line-height: 1;
 }
@@ -574,7 +589,7 @@ const savedHint = computed(() => {
 }
 .err-line {
   color: var(--a-danger);
-  font-size: 0.8rem;
+  font-size: var(--fs-sm);
   margin: 0 0 12px;
 }
 .side-actions {

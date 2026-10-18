@@ -1,5 +1,5 @@
 <script setup>
-import { computed } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 
 const props = defineProps({
   cipai: { type: Object, default: null },
@@ -22,21 +22,45 @@ function toneName(ch) {
   if (ch === '●') return '仄'
   return '可平可仄'
 }
+
+/* Esc 关闭 + 焦点归还：本弹窗是 role="dialog"，键盘用户理应能按 Esc 退出。 */
+const dialogEl = ref(null)
+let opener = null
+function onKey(e) {
+  if (e.key === 'Escape' && props.open) {
+    e.preventDefault()
+    emit('close')
+  }
+}
+watch(
+  () => props.open,
+  (v, prev) => {
+    if (v && !prev) {
+      opener = document.activeElement
+      nextTick(() => dialogEl.value?.focus())
+    } else if (!v && prev) {
+      if (opener && typeof opener.focus === 'function' && document.contains(opener)) opener.focus()
+      opener = null
+    }
+  }
+)
+onMounted(() => window.addEventListener('keydown', onKey))
+onBeforeUnmount(() => window.removeEventListener('keydown', onKey))
 </script>
 
 <template>
   <Teleport to="body">
     <Transition name="fade">
       <div v-if="open && cipai" class="mask no-print" @click.self="emit('close')">
-        <div class="dlg" role="dialog" aria-modal="true">
+        <div ref="dialogEl" class="dlg" role="dialog" aria-modal="true" aria-labelledby="cp-title" tabindex="-1">
           <header class="dlg-head">
             <div>
-              <h2 class="mb0 kai">{{ cipai.name }}</h2>
+              <h2 id="cp-title" class="mb0 kai">{{ cipai.name }}</h2>
               <div class="small muted mt1">
                 又名 {{ (cipai.alias || []).join('、') || '—' }}
               </div>
             </div>
-            <button class="close" title="关闭" @click="emit('close')">✕</button>
+            <button class="close" aria-label="关闭" title="关闭" @click="emit('close')">✕</button>
           </header>
 
           <div class="facts row wrap">
@@ -255,13 +279,13 @@ function toneName(ch) {
   color: var(--ink-2);
 }
 .pcell.b .sym {
-  color: var(--ink-4);
+  color: var(--ink-3);
 }
 .pcell.last .sym {
   font-weight: 700;
 }
 .rmark {
-  font-size: 0.6rem;
+  font-size: var(--fs-xs);
   color: var(--cinnabar);
   line-height: 1;
 }

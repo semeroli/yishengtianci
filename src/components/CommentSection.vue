@@ -285,7 +285,7 @@ defineExpose({ load })
   border: 0;
   padding: 0;
   color: var(--ink-3);
-  font-size: 0.76rem;
+  font-size: var(--fs-xs);
   cursor: pointer;
   transition: color var(--t-fast);
 }

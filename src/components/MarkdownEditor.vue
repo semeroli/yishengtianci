@@ -340,7 +340,7 @@ defineExpose({ insertAtCursor, applyToolByKey, focus: () => ta.value?.focus() })
   height: 28px;
   padding: 0 6px;
   cursor: pointer;
-  font-size: 0.8rem;
+  font-size: var(--fs-sm);
   font-family: var(--a-font-mono, var(--font-mono));
   transition: all 120ms;
 }

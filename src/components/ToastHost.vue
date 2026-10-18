@@ -106,7 +106,7 @@ const isAdmin = computed(() => String(route.path || '').startsWith('/admin'))
   white-space: nowrap;
 }
 .toast .act:hover {
-  background: var(--cinnabar);
+  background: var(--cinnabar-solid); /* 悬停时底上压白字，必须用 solid 那支（深色下 --cinnabar 太浅） */
   color: #fff;
 }
 .toast-enter-active,
