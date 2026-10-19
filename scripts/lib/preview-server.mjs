@@ -11,6 +11,8 @@
  *   · 命中真实文件 → 原样返回（这就是预渲染产物能被爬虫读到的前提）
  *   · 带 SPA 前缀（/blog/xxx、/admin/xxx）→ 返回根 index.html，交给前端路由
  *   · 其余没命中的路径 → 返回 404.html（真 404，不是软 404）
+ * 另外会模拟 Pages 的**干净地址**（`/x.html` → 308 → `/x`），否则「200 改写指向
+ * .html 会造成线上死循环」这类致命配置在本地会验不出来（详见 prettyPath）。
  *
  * /api/* 有两种模式：
  *   local —— 交给 shared/api-handler.js + 本地 D1（.data/yisheng.db），
@@ -71,12 +73,33 @@ function matchRule(rules, pathname) {
   for (const r of rules) {
     if (r.from.endsWith('/*')) {
       const base = r.from.slice(0, -2) // '/blog/*' → '/blog'
-      if (pathname === base || pathname.startsWith(base + '/')) return r
+      /* ⚠️ `/blog/*` **不匹配** `/blog` 本身（只匹配 `/blog/` 及其下）。
+       * 早先这里写了 `pathname === base` 也算命中，结果 `/blog` 被当成动态路由
+       * 发回了首页空壳，验收脚本报「/blog 的 canonical 指向根」——
+       * 而线上 `/blog` 拿到的其实是预渲染好的 blog.html。本地模拟器一旦比
+       * 生产「多命中一条」，验出来的结论就全是假的。 */
+      if (pathname.startsWith(base + '/')) return r
     } else if (r.from === pathname) {
       return r
     }
   }
   return null
+}
+
+/**
+ * Cloudflare Pages 的「干净地址」（pretty URL）规范化：
+ * 任何 `/x.html` 都会被 **308** 到 `/x`，再由 `/x` 内部映射回 `x.html`。
+ *
+ * 为什么非得在本地模拟这一层：
+ *   _redirects 里写 `/studio  /studio.html  200` 时，生产上的真实链路是
+ *   `/studio` → 内部改写 `/studio.html` → **被规范化成 308 回 `/studio`** →
+ *   规则又命中 ⇒ **永久死循环**。若本地模拟器直接读文件返回 200，
+ *   这个致命配置在验收里会显示「全绿」，上线才炸（本项目已经炸过一次）。
+ */
+function prettyPath(pathname) {
+  const m = pathname.match(/^(.*)\.html$/)
+  if (!m) return null
+  return m[1] === '/index' ? '/' : m[1]
 }
 
 /** 没有数据库时各接口给什么 —— 全给「空」，不给「错」 */
@@ -244,6 +267,14 @@ export async function startPreview({
         res.end()
         return
       }
+      /* 200 改写的目标是 `*.html` ⇒ 生产上会被干净地址规范化成 308 回原路径，
+       * 规则再次命中，形成死循环。这里如实回 308，让验收脚本抓得到。 */
+      const pretty = rule.status === 200 ? prettyPath(rule.to) : null
+      if (pretty) {
+        res.writeHead(308, { location: pretty })
+        res.end()
+        return
+      }
       const target = await findFile(root, rule.to)
       if (!target) {
         const msg = `_redirects 把 ${pathname} 指向 ${rule.to}，但产物里没有这个文件`
@@ -263,6 +294,13 @@ export async function startPreview({
     }
 
     /* ── 静态文件 ── */
+    /* 直接点名要 `.html` 的请求先按干净地址 308 走（Pages 就是这么干的） */
+    const directPretty = prettyPath(pathname)
+    if (directPretty) {
+      res.writeHead(308, { location: directPretty })
+      res.end()
+      return
+    }
     const file = await findFile(root, pathname)
     if (file) {
       const buf = await fs.readFile(file)

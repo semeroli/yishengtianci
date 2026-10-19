@@ -1,54 +1,44 @@
 # Cloudflare Pages 路由规则（放在 public/ 下，构建时会原样复制进 dist/）
 #
-# ── 这个文件现在干两件事 ─────────────────────────────────────
+# ── 这个文件只干一件事 ───────────────────────────────────────
 #
-# ① 把「地址」接到**预渲染好的静态文件**上（前 11 行）
-#    本站是单页应用，源码里的 index.html 只有一个空壳 <div id="app"></div>，
-#    正文全靠浏览器执行 JS 才出现。谷歌能执行 JS（但慢），**百度基本不执行** ——
-#    爬到的是空页面，于是判定没有正文、不予收录。
-#    所以构建完会跑 scripts/prerender.mjs，用 Chrome 真渲染一遍，把完整正文
-#    存成 dist/studio.html、dist/blog.html 等文件（`npm run prerender`）。
-#    下面这些规则就是让 /studio 这类地址直接返回那个文件。
+# 让「刷新不 404」成立：前端路由是 History 模式，/blog/某篇文章、/admin/设置
+# 这些地址在服务器上没有同名文件，不重写的话用户一按 F5 就 404。
 #
-# ② 让「刷新不 404」仍然成立（后半段）
-#    前端路由用 History 模式，/blog/某篇文章、/admin/设置 这些地址在服务器上
-#    并没有同名文件。不重写的话，用户一按 F5 就 404。
+# ── 预渲染页面**不需要**在这里写规则 ─────────────────────────
 #
-# ── 三条必须记住的规矩 ───────────────────────────────────────
-# ① **规则按顺序生效，命中第一条就停。** 所以精确路径写在通配前面。
-# ② **重定向永远优先于静态文件**（Cloudflare 官方原文：
+# 构建会跑 scripts/prerender.mjs，把完整正文存成 dist/studio.html、dist/blog.html……
+# Cloudflare Pages 的「干净地址」（clean URL）机制会自动把 /studio 映射到
+# studio.html 并**直接返回 200**，不用我操心。
+#
+# 🔴🔴 2026-10-19 血泪教训：**千万别再给这些页面写 `/studio → /studio.html 200`**。
+#   实测线上会变成死循环：/studio 308 → /studio，/studio.html 308 → /studio，
+#   整站那几个页面全部打不开（部署地址与正式域名都一样）。
+#   原因：改写目标本身也是一个「会被规范化重定向的 .html 地址」，
+#   平台把改写当成了跳转，两头互相指。
+#   同理，改写目标写 `/index.html` 也不行 —— /admin 会 308 跳到 `/`。
+#   ✅ 唯一安全写法：改写目标用 `/`（它就是规范的 index.html 地址）。
+#
+# ── 两条必须记住的规矩 ───────────────────────────────────────
+# ① 规则按顺序生效，命中第一条就停 —— 通配写在后面。
+# ② 重定向永远优先于静态文件（官方原文：
 #    "Redirects are always followed, regardless of whether or not an asset
 #    matches the incoming request."）。
-#    这条是旧的 `/*  /index.html  200` 通配为什么必须拆掉的原因 ——
-#    它会把预渲染出来的 studio.html 一起盖掉，等于白做。
-# ③ **重写目标不能落进后面的通配范围。** 预渲染产物是 dist/blog.html，
-#    不是 dist/blog/index.html —— 后者会同时被下面的 `/blog/*` 命中，
-#    一旦平台把重写目标再过一遍规则，正文就会被空壳顶掉。
+#    所以旧版那条 `/*  /index.html  200` 通配必须拆掉，否则会把预渲染产物盖掉。
 #
-# ── 末尾没有通配兜底了，会怎样？──────────────────────────────
-# 这正是想要的：真正的 404 会返回 404 状态码 + dist/404.html（自己生成的那页）。
-# 旧写法把「不存在的网址」也回 200 + 首页，属于「软 404」——
-# 搜索引擎会把一堆垃圾地址当成正常页面收录，还稀释首页权重。
+# ── 末尾故意没有通配兜底 ─────────────────────────────────────
+# 不存在的地址会返回真 404 + dist/404.html。
+# 旧写法把「不存在的网址」也回 200 + 首页（软 404），搜索引擎会把垃圾地址当正常页收录。
 #
-# ⚠️ /api/*、/robots.txt、/sitemap.xml 走的是 Pages Functions（functions/ 目录），
-#    官方文档明确：_redirects 不作用于 Functions 处理的路由，这里不必（也不能）管它们。
+# ⚠️ /api/*、/robots.txt、/sitemap.xml 走 Pages Functions（functions/ 目录），
+#    _redirects 不作用于 Functions 处理的路由，这里不必（也不能）管它们。
 
-# ── ① 预渲染页面（精确匹配，带不带结尾斜杠都指到同一个文件，避免两份内容）──
-/studio      /studio.html      200
-/studio/     /studio.html      200
-/blog        /blog.html        200
-/blog/       /blog.html        200
-/rhyme       /rhyme.html       200
-/rhyme/      /rhyme.html       200
-/about       /about.html       200
-/about/      /about.html       200
-/favorites   /favorites.html   200
-/favorites/  /favorites.html   200
-
-# ── ② 其余动态路由：仍交给前端渲染（地址栏不变，状态码 200）──
-#    /blog/某篇文章  —— 文章是后台随时新增的，构建时不一定存在，所以留在前端渲。
-#    /admin/**       —— 后台页面全在前端渲染，没有预渲染的价值（也不该被收录）。
-/blog/*      /index.html       200
-/admin       /index.html       200
-/admin/      /index.html       200
-/admin/*     /index.html       200
+# ── 动态路由：交给前端渲染（地址栏不变，状态码 200）──
+#    /blog/某篇文章  —— 文章是后台随时新增的，构建时不一定存在
+#    /admin/**       —— 后台全在前端渲染，没有预渲染价值（也不该被收录）
+#
+# 注意目标写 `/` 而不是 `/index.html`，理由见上面那段红色警告。
+/blog/*      /    200
+/admin       /    200
+/admin/      /    200
+/admin/*     /    200

@@ -50,8 +50,11 @@ function check(ok, name, detail = '') {
   console.log(`  ${ok ? '✓' : '✗'} ${name}${detail ? '　' + detail : ''}`)
 }
 
+/** 抓一页。**手动跟随重定向**：配置写错时会形成死循环，
+ *  自动跟随要么转 20 圈后抛异常、要么把最终页当成本页，两种都会让结论失真；
+ *  手动模式下 308 会原样暴露成「状态码不是 200」，一眼看出问题。 */
 async function get(origin, path) {
-  const r = await fetch(origin + path)
+  const r = await fetch(origin + path, { redirect: 'manual' })
   const body = await r.text()
   return { status: r.status, type: r.headers.get('content-type') || '', body, text: htmlToText(body) }
 }
@@ -76,23 +79,50 @@ async function main() {
   } catch {}
   check(has404, '404.html 存在', has404 ? '' : '缺失（未知地址会显示 Cloudflare 默认页）')
 
-  /* ── ② 路由规则是否覆盖了每个预渲染文件 ── */
+  /* ── ② 路由规则：只检查「不许写什么」，不要求「必须写什么」 ──
+   *
+   * 这里曾经要求「每个预渲染页面都得有一条 /x → /x.html 200」，那是错的。
+   * Pages 的干净地址本来就会把 /studio 映射到 studio.html 并直接回 200，
+   * **不需要任何规则**；真去写这条规则反而会变成线上永久死循环
+   * （/studio → /studio.html → 308 回 /studio → ……）。2026-10 已经踩过一次，
+   * 六个页面全挂。所以规则文件的正确姿势是「越少越好，只留必需的兜底」。 */
   console.log('\n  ▸ 路由规则（dist/_redirects）')
   const rulesText = await fs.readFile(join(DIST, '_redirects'), 'utf8')
-  const ruleLines = rulesText
+  const rules = rulesText
     .split('\n')
     .map((l) => l.trim())
     .filter((l) => l && !l.startsWith('#'))
-  for (const r of ROUTES) {
-    if (r.path === '/') continue // 根目录天然由 index.html 承担，不需要规则
-    const hit = ruleLines.some((l) => {
-      const [from, to] = l.split(/\s+/)
-      return from === r.path && to === '/' + r.file
+    .map((l) => {
+      const [from, to, status] = l.split(/\s+/)
+      return { from, to, status: Number(status || 302) }
     })
-    check(hit, `${r.path} → /${r.file}`, hit ? '' : '规则缺失，该页线上会 404')
-  }
-  const hasSoft404 = ruleLines.some((l) => l.split(/\s+/)[0] === '/*')
+
+  /* 🔴 头号杀手：200 改写的目标写成 *.html */
+  const htmlTargets = rules.filter((r) => r.status === 200 && /\.html$/.test(r.to))
+  check(
+    htmlTargets.length === 0,
+    '没有指向 *.html 的 200 改写（写了会死循环）',
+    htmlTargets.map((r) => `${r.from} → ${r.to} 200`).join('；')
+  )
+
+  /* 200 改写的目标写 /index.html 也不行：/admin 会被 308 跳到 / */
+  const wildcards = rules.filter((r) => r.from.endsWith('/*'))
+  const badWild = wildcards.filter((r) => r.to !== '/')
+  check(
+    badWild.length === 0,
+    '通配规则的目标一律是 `/`（写 /index.html 会 308 跳到根）',
+    badWild.map((r) => `${r.from} → ${r.to}`).join('；')
+  )
+
+  const hasSoft404 = rules.some((r) => r.from === '/*')
   check(!hasSoft404, '没有 `/*` 通配兜底（否则会盖掉预渲染 + 造成软 404）')
+
+  /* 预渲染页面不该有精确规则去「帮忙」—— 有就说明有人在修一个不存在的问题 */
+  for (const r of ROUTES) {
+    if (r.path === '/') continue
+    const hit = rules.find((x) => x.from === r.path || x.from === r.path + '/')
+    check(!hit, `${r.path} 不写精确规则（交给干净地址）`, hit ? `多余规则：${hit.from} → ${hit.to}` : '')
+  }
 
   /* ── ③ 真请求验证 ── */
   const preview = await startPreview({ dir: DIST, useRedirects: true, api: 'stub' })
