@@ -12,8 +12,9 @@
  * 用法：npm run test:ai   （失败以非零码退出）
  */
 
-import { buildAiPrompt, callUpstream, parseAiLines } from '../shared/api-handler.js'
+import { buildAiPrompt, callUpstream, parseAiLines, judgeAiLines, AI_PROVIDERS, resolveProviders, hasAiUpstream } from '../shared/api-handler.js'
 import { getCipai } from '../shared/cipai.js'
+import { compose } from '../shared/engine.js'
 
 let pass = 0
 let fail = 0
@@ -30,6 +31,8 @@ function check(name, cond, extra = '') {
 // ── 桩件：把 fetch 换掉，记录每次真正发出去的请求 ──────────────
 let sent = []
 let reply = () => okReply('{"lines":["测试"]}')
+/** 命中就「只连不出字」——用来复现「上游悬死」那一类故障 */
+let hangMatch = null
 
 function okReply(content, extra = {}) {
   return new Response(
@@ -42,8 +45,30 @@ function okReply(content, extra = {}) {
   )
 }
 
+/** 永不回字，直到 signal 超时被中止 */
+function hangUntilAbort(signal) {
+  return new Promise((_, reject) => {
+    const fail = (msg) => {
+      const e = new Error(msg)
+      e.name = 'AbortError'
+      reject(e)
+    }
+    /* ⚠️ AbortSignal.timeout 的定时器是 unref 的，撑不住事件循环 ——
+     * 只挂监听的话，Node 会以「unsettled top-level await」直接退出。
+     * 所以这里必须自己留一个 ref 的兜底闹钟。 */
+    const guard = setTimeout(() => fail('桩件保护：5 秒内没收到中止信号'), 5000)
+    const onAbort = () => {
+      clearTimeout(guard)
+      fail('This operation was aborted')
+    }
+    if (signal?.aborted) return onAbort()
+    signal?.addEventListener('abort', onAbort)
+  })
+}
+
 globalThis.fetch = async (url, init) => {
   sent.push({ url, init, body: JSON.parse(init.body) })
+  if (hangMatch && hangMatch(url)) return hangUntilAbort(init.signal)
   return reply(sent.length)
 }
 
@@ -55,7 +80,10 @@ const ENV = {
   AI_TIMEOUT_MS: '45000'
 }
 const MSGS = [{ role: 'user', content: '试填一首' }]
-const reset = () => (sent = [])
+const reset = () => {
+  sent = []
+  hangMatch = null
+}
 
 console.log('')
 console.log('  AI 通道参数回归自测')
@@ -186,6 +214,96 @@ check('完全不是 JSON 时按换行退化', parseAiLines('第一句\n第二句
 check(
   '全英文正文会被剥成空串（所以必须出汉字）',
   parseAiLines('{"lines":["abc","def"]}', 2)?.every((x) => x === '') === true
+)
+
+// ── ⑪ 多上游链（商汤 / InferX / 魔搭，2026-11-08 加装）──────────────
+// 这一段的重心不是「能调通」，而是「一家坏掉时链还能走完」。
+// 带候选链的调度器最致命的 bug 是：主循环只在等一家，而那家
+// 「连得上但永不出字」时，后面的候选一次都轮不到 —— 参数配得再好全是死代码。
+const MULTI = {
+  SENSENOVA_API_KEY: 'sn-test-key',
+  INFERX_API_KEY: 'ix-test-key',
+  AI_API_KEY: 'ms-test-key',
+  AI_DISABLE_THINKING: '1',
+  AI_TIMEOUT_MS: '300', // 单次尝试 300ms，测试才跑得快
+  AI_TOTAL_BUDGET_MS: '3000'
+}
+const ids = (env) => resolveProviders(env).map((p) => p.id).join(',')
+
+check('三个 Key 都在 ⇒ 默认顺序 商汤 → InferX → 魔搭', ids(MULTI) === 'sensenova,inferx,modelscope', ids(MULTI))
+check('AI_CHAIN 能改顺序，没提到的接在末尾', ids({ ...MULTI, AI_CHAIN: 'inferx' }) === 'inferx,sensenova,modelscope', ids({ ...MULTI, AI_CHAIN: 'inferx' }))
+check('只配了商汤 Key ⇒ 链里只有商汤', ids({ SENSENOVA_API_KEY: 'x' }) === 'sensenova', ids({ SENSENOVA_API_KEY: 'x' }))
+check('密钥别名也认（SENSETIME_API_KEY）', resolveProviders({ SENSETIME_API_KEY: 'x' })[0]?.id === 'sensenova')
+check('密钥别名也认（MODELSCOPE_API_KEY）', resolveProviders({ MODELSCOPE_API_KEY: 'x' })[0]?.id === 'modelscope')
+check('一个 Key 都没有 ⇒ 链为空', resolveProviders({}).length === 0)
+check('hasAiUpstream 判得对', hasAiUpstream(MULTI) === true && hasAiUpstream({}) === false)
+check(
+  '模型名与地址都能被环境变量覆盖（末尾斜杠会被去掉）',
+  resolveProviders({ INFERX_API_KEY: 'x', INFERX_MODEL: 'm2', INFERX_BASE: 'https://a/v9///' })[0].model === 'm2' &&
+    resolveProviders({ INFERX_API_KEY: 'x', INFERX_BASE: 'https://a/v9///' })[0].base === 'https://a/v9'
+)
+
+// ── 关思考按 dialect 发，不是一招通吃 ────────────────────────
+reset()
+await callUpstream(MULTI, MSGS, { provider: 'sensenova' })
+check('商汤用 reasoning_effort:"none" 关思考', sent[0].body.reasoning_effort === 'none', JSON.stringify(sent[0].body))
+check('商汤不会瞎发 enable_thinking（那是魔搭的字段）', !('enable_thinking' in sent[0].body))
+reset()
+await callUpstream(MULTI, MSGS, { provider: 'inferx' })
+check('InferX 是纯文本上游 ⇒ 一个关思考字段都不发', !('enable_thinking' in sent[0].body) && !('reasoning_effort' in sent[0].body))
+check('InferX 只发一次（不为一个不存在的开关白烧额度）', sent.length === 1, `实际 ${sent.length} 次`)
+reset()
+await callUpstream(MULTI, MSGS, { provider: 'modelscope' })
+check(
+  '魔搭仍发 enable_thinking 双保险',
+  sent[0].body.enable_thinking === false && sent[0].body.chat_template_kwargs?.enable_thinking === false
+)
+
+// ── 商汤两套入口：Key 串区就是 401，必须自动换另一套 ──────────
+reset()
+reply = (n) => (n === 1 ? new Response('{"error":{"message":"Authorization Not Found"}}', { status: 401 }) : okReply('收到'))
+const baseSwap = await callUpstream(MULTI, MSGS, { provider: 'sensenova' })
+check('商汤第一套入口 401 ⇒ 自动换 sensecore 入口', sent.length === 2 && sent[1].url.includes('compatible-mode/v2'), sent.map((s) => s.url).join(' → '))
+check('换入口后拿到了内容', baseSwap.text.includes('收到'), baseSwap.text)
+reply = () => okReply('{"lines":["测试"]}')
+
+// ── 🔴🔴 最关键：第一家「连得上但永不出字」时，必须走到第二家 ──
+reset()
+hangMatch = (url) => url.includes('token.sensenova.cn')
+const tHang = Date.now()
+const afterHang = await callUpstream(MULTI, MSGS)
+const hangMs = Date.now() - tHang
+check('第一家悬死 ⇒ 超时后自动换下一家', sent.length === 2 && sent[1].url.includes('inferx'), sent.map((s) => s.url).join(' → '))
+check('悬死判定真的执行了（没有一直干等）', hangMs < 2000, `${hangMs}ms`)
+check('换到第二家后拿到了内容', afterHang.text.includes('测试') && afterHang.provider === 'inferx', JSON.stringify(afterHang).slice(0, 90))
+
+// ── 401 不值得在同一家死等，但链要继续走 ─────────────────────
+reset()
+reply = () => new Response('{"error":{"message":"bad key"}}', { status: 401 })
+let e401 = null
+try {
+  await callUpstream(MULTI, MSGS)
+} catch (e) {
+  e401 = e
+}
+check('401 会把整条链走完（三家都试过）', sent.length >= 4, `实际 ${sent.length} 次`)
+check(
+  '全灭时报错点名每一家',
+  /商汤日日新/.test(e401?.message || '') && /InferX/.test(e401?.message || '') && /魔搭/.test(e401?.message || ''),
+  e401?.message
+)
+reply = () => okReply('{"lines":["测试"]}')
+
+// ── 判卷函数：本地引擎出的词，自己必须也能过 ──────────────────
+// 否则会出现「AI 拒掉一首本来合格的好词」这种自相矛盾的回落。
+const huanxisha = getCipai('huanxisha')
+const goodPoem = compose({ cipaiId: 'huanxisha', prompt: '秋夜独坐', seed: 20261108 })
+const goodText = goodPoem.lines.map((l) => l.text)
+check('引擎产出的词能通过 AI 判卷（两处判据一致）', judgeAiLines(huanxisha, goodText).length === 0, JSON.stringify(judgeAiLines(huanxisha, goodText)))
+check('字数不符会被判出问题', judgeAiLines(huanxisha, goodText.map((t, i) => (i === 0 ? t + '多' : t))).length > 0)
+check(
+  'AI_PROVIDERS 里每一家的必需字段都齐（id/label/bases/model/keyEnv）',
+  AI_PROVIDERS.every((p) => p.id && p.label && p.bases?.length && p.model && p.keyEnv?.length)
 )
 
 // ── 汇总 ─────────────────────────────────────────────────────

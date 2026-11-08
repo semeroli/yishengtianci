@@ -109,7 +109,16 @@ wrangler.toml           Cloudflare 绑定配置（D1 / KV / R2 / 普通变量）
 不配也能用：本地引擎功能是完整的。配上之后 `/generate` 会优先走 AI，
 **失败、超时、返回字数不符或韵脚重复都会自动回落本地引擎**（所以线上不会"转圈转到空"）。
 
-### 4.1 默认接魔搭社区（ModelScope）
+### 4.1 三家上游并存，按序降级
+
+不配也能用。配了之后是**上游链**：一家失败（连不上、超时、401、吐的东西不合律）
+就自动换下一家，全都不行才回落本地引擎。**有几把 Key 就填几把，没填的自动跳过。**
+
+| 上游 | baseUrl | 默认模型 | 密钥变量 |
+|---|---|---|---|
+| 商汤日日新 | `https://token.sensenova.cn/v1` | `sensenova-6.8-flash-lite` | `SENSENOVA_API_KEY` |
+| InferX | `https://model.inferx.net/endpoints/v1` | `deepseek-v4.1-flash-1017-basic` | `INFERX_API_KEY` |
+| 魔搭 ModelScope | `https://api-inference.modelscope.cn/v1` | `Qwen/Qwen3.8-Flash-Next` | `AI_API_KEY` |
 
 本地开发：复制示例文件按说明填好，`server/dev-server.mjs` 会自动读它。
 
@@ -118,68 +127,77 @@ cp .dev.vars.example .dev.vars
 ```
 
 ```
-AI_API_KEY=ms-xxxx                                  # 魔搭「访问令牌」
-AI_BASE_URL=https://api-inference.modelscope.cn/v1
-AI_MODEL=Qwen/Qwen3.8-Flash-Next
-AI_DISABLE_THINKING=1                               # 见 4.2，不是可选项
-AI_TIMEOUT_MS=45000
+SENSENOVA_API_KEY=xxx                    # 有几个填几个
+INFERX_API_KEY=xxx
+AI_API_KEY=ms-xxxx
+AI_CHAIN=sensenova,inferx,modelscope     # 顺序，可省略
+AI_DISABLE_THINKING=1                    # 见 4.2，不是可选项
+AI_TIMEOUT_MS=9000                       # 单家单次上限
+AI_TOTAL_BUDGET_MS=27000                 # 整条链总预算（CF 单请求上限 30s）
 ```
 
-### 4.2 ⚠️ 挑模型只有一条硬标准：关掉「思考」
+两个容易踩的点，代码已经处理，但值得知道：
 
-魔搭上**绝大多数模型都是推理模型**：默认会把 `max_tokens` 整段烧在「思考」上，
+- **商汤有两套互不相通的入口**，Key 串区一律 401：`platform.sensenova.cn` 的 Key 走
+  `token.sensenova.cn/v1`；sensecore 大装置的 Key 走 `api.sensenova.cn/compatible-mode/v2`。
+  代码里两家入口都留了，401/404 时自动换另一套（可用 `SENSENOVA_BASE` 写死）。
+- **InferX 的路径有 `/endpoints/v1` 和 `/v1` 两种写法**，同样做了自动切换。
+
+**超时为什么是「单家 + 总预算」两个值**：只写单家上限的话，第一家「连得上但永不出字」
+会把整个 30s 吃光，**后面几家一次都轮不到** —— 链等于没建。所以单次超时按「还剩几家」均分，
+取 `min(AI_TIMEOUT_MS, 剩余预算 / 剩余家数)`，硬顶 28s。
+
+### 4.2 ⚠️ 关「思考」的写法各家不同
+
+这几家的主力模型多是推理模型：默认会把 `max_tokens` 整段烧在「思考」上，
 正文一个字不吐 —— 症状是 `finish_reason=length`、`content` 为空、`reasoning_content` 上千字。
 所以 `AI_DISABLE_THINKING=1` **不是性能优化，是能不能用的前提**。
 
-代码里已经做了两件事（`shared/api-handler.js`）：
+写法不统一，代码按家分别发（`AI_PROVIDERS[].noThink`）：
 
-1. 关思考时**两个字段名都发** —— `enable_thinking: false` + `chat_template_kwargs.enable_thinking: false`
-   （不同平台认的写法不一样，双保险）；
-2. **平台不认这个字段就自动退让** —— 先带字段发一次，若被 400/422 拒绝，去掉字段原样再发一次。
-   绝不会因为一个可选参数把整条 AI 通道打死。
+| 上游 | 关思考的字段 |
+|---|---|
+| 魔搭 | `enable_thinking: false` + `chat_template_kwargs.enable_thinking: false`（双保险） |
+| 商汤日日新 | `reasoning_effort: "none"` |
+| InferX | 不需要（纯文本上游，不发任何多余字段，省一次白烧额度） |
 
-那具体选哪个模型？**不要凭感觉挑**，填好 Key 跑体检：
+并且**平台不认这个字段就自动退让**：先带字段发一次，被 400/422 拒绝就去掉字段原样再发一次。
+绝不会因为一个可选参数把整条 AI 通道打死。
+
+### 4.3 选哪个模型？跑体检，别凭感觉
 
 ```bash
-npm run probe:models            # 候选模型挨个真机试
-npm run probe:models --fast     # 只跑「关思考」一档，省额度
-npm run probe:models --conc=4   # 加大并发
+npm run probe:models                          # 逐家测各自的默认模型
+npm run probe:models -- --provider=inferx     # 只测某一家
+npm run probe:models -- --fast                # 只跑「关思考」一档，省额度
+npm run probe:models sensenova:模型名 inferx:模型名   # 指定「家:模型」
 ```
 
-体检用的是**线上真正发出去的那份 prompt 和解析逻辑**（直接从 `shared/api-handler.js` import，
+体检用的是**线上真正发出去的那份 prompt、超时和判卷**（直接从 `shared/api-handler.js` import，
 不是脚本里另抄一份），对每个模型报：耗时 / 正文字数 / 合律句数；
 对没通过的模型**再跑一次「原样不关思考」做对照** —— 那就是"思考吃光额度"的现场证据。
-它还会把冠军模型的试填词打印出来给你肉眼看。
 
-按「同类中文格律任务 + 45 秒内出结果」这个标准，建议按下面顺序试：
-
-| 顺序 | 模型 | 说明 |
-|---|---|---|
-| ★ 首选 | `Qwen/Qwen3.8-Flash-Next` | 通义 Flash 档，中文语感好、快，同类中文词句任务实测 8~13 秒完成 |
-| 备选 | `deepseek-ai/DeepSeek-V4-Flash-0731` | DeepSeek 系，中文稳 |
-| 备选 | `ZhipuAI/GLM-4.7-Flash` | 智谱 Flash 档，速度取向 |
-| 备选 | `MiniMax/MiniMax-M3` | 长文笔力更好，慢一些，注意超时 |
-
-> 换模型只改 `AI_MODEL` 一行，不用动任何业务代码。
-
-### 4.3 不用魔搭、接别家
-
-改上面两行即可，别家大多不是推理模型，那时 `AI_DISABLE_THINKING=0` 也行：
+### 4.4 线上自检（不用登后台、不消耗额度）
 
 ```
-AI_BASE_URL=https://api.deepseek.com/v1      AI_MODEL=deepseek-chat
-AI_BASE_URL=https://dashscope.aliyuncs.com/compatible-mode/v1    AI_MODEL=qwen-plus
+GET /api/ai-status             # 看配置：链里有哪几家、各自模型/地址、Key 长度
+GET /api/ai-status?deep=1      # 逐家真发一条最小请求（每家约 20 token），报 ok/耗时/报错
 ```
 
-### 4.4 这套参数有回归闸门
+「出不来词」这一个现象至少有五种原因（没 Key / Key 错 / 地址错 / 模型名错 / 思考没关），
+这个接口把它们一次分清。**密钥只报长度、不报内容**，因为它是公开接口。
+
+### 4.5 这套参数有回归闸门
 
 ```bash
-npm run test:ai     # 34 项，不需要网络、不需要 Key，毫秒级
+npm run test:ai     # 57 项，不需要网络、不需要 Key，毫秒级
 ```
 
-用桩件替换 `fetch`，把请求体逐字节验一遍：关思考字段有没有发、被 400 拒绝会不会退让、
-空正文报错有没有点明原因、`max_tokens` / `Authorization` / 超时有没有正确透传。
-这类线上故障**九成不是业务代码错，而是请求体少了一个字段**，靠肉眼 review 很难拦住。
+用桩件替换 `fetch`，把请求体逐字节验一遍：关思考字段有没有按家发对、被 400 拒绝会不会退让、
+空正文报错有没有点明原因、`max_tokens` / `Authorization` / 超时有没有正确透传，
+以及**上游链的降级行为**——特别是「第一家悬死时会不会超时放弃、走到第二家」，
+还有「商汤第一套入口 401 时会不会自动换 sensecore 入口」。
+这类线上故障**九成不是业务代码错，而是请求体少了一个字段或链路卡在一家身上**，靠肉眼 review 很难拦住。
 
 ---
 
@@ -242,14 +260,16 @@ D1 控制台执行即可。它会先把密码散列出来、再用登录时的�
 
 | 放什么 | 放哪里 |
 |---|---|
-| `SITE_SECRET`、`AI_API_KEY` | 控制台 **Secret**（加密、不可回读） |
-| `AI_BASE_URL` / `AI_MODEL` / `AI_DISABLE_THINKING` / `AI_TIMEOUT_MS` | `wrangler.toml` 的 `[vars]`（明文、随仓库走） |
+| `SITE_SECRET`、`AI_API_KEY`、`SENSENOVA_API_KEY`、`INFERX_API_KEY` | 控制台 **Secret**（加密、不可回读） |
+| `AI_CHAIN` / `AI_BASE_URL` / `AI_MODEL` / `AI_DISABLE_THINKING` / `AI_TIMEOUT_MS` / `AI_TOTAL_BUDGET_MS` | `wrangler.toml` 的 `[vars]`（明文、随仓库走） |
 
 命令行最省事、无歧义：
 
 ```bash
-npx wrangler pages secret put SITE_SECRET   # 随机串，长度 ≥ 16
-npx wrangler pages secret put AI_API_KEY    # 不用 AI 可以不设
+npx wrangler pages secret put SITE_SECRET        # 随机串，长度 ≥ 16
+npx wrangler pages secret put AI_API_KEY         # 魔搭
+npx wrangler pages secret put SENSENOVA_API_KEY  # 商汤日日新
+npx wrangler pages secret put INFERX_API_KEY     # InferX
 ```
 
 > 🔴 **必须选 Secret 类型。** 密钥写进 `[vars]` 或控制台的「明文变量」会以明文

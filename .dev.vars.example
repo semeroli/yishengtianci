@@ -12,22 +12,37 @@
 # 否则会退化到代码里的开发默认值（那样任何人都能伪造管理员令牌）。
 SITE_SECRET=请换成一串你自己的随机字符_至少16位
 
-# AI 接口。留空则只用内置词库引擎（功能完整，不联网、零成本）。
-# 填了之后 /generate 会优先调用大模型，失败或超时自动回落本地引擎。
+# AI 接口（可多家并存，按序降级）。一家都不填就只用内置词库引擎
+# （功能完整、不联网、零成本）。填了之后 /generate 会优先调用大模型，
+# 全部失败或超时自动回落本地引擎 —— 不会给用户一首不合律的词。
 #
-# 默认按魔搭社区（ModelScope）配，与 wrangler.toml 的 [vars] 保持一致。
-# Key 到 https://modelscope.cn 的「访问令牌」页面拿（形如 ms-xxxx）。
+# 三家各自的 Key（有几个填几个，没填的自动跳过）：
+SENSENOVA_API_KEY=
+INFERX_API_KEY=
 AI_API_KEY=
+
+# 降级顺序。留空则按「商汤 → InferX → 魔搭」。
+AI_CHAIN=sensenova,inferx,modelscope
+
+# 非密钥的策略项（可留空用默认值）
 AI_BASE_URL=https://api-inference.modelscope.cn/v1
 AI_MODEL=Qwen/Qwen3.8-Flash-Next
-# 推理型模型（魔搭上绝大多数）必须置 1，否则正文空、max_tokens 全被思考吃掉
+# 推理型模型必须置 1，否则正文空、max_tokens 全被思考吃掉
 AI_DISABLE_THINKING=1
-# 单次上游调用超时（毫秒）。填词正文很短，45 秒足够；换大模型可加大到 60000。
-AI_TIMEOUT_MS=45000
+# 单家单次尝试上限（还会按「还剩几家」均分，取更小的那个）
+AI_TIMEOUT_MS=9000
+# 整条链总预算。CF Pages 单请求上限 30s，别调大。
+AI_TOTAL_BUDGET_MS=27000
+
+# 想先挑模型再定？填好 Key 后跑：npm run probe:models
+# 它会把**每一家**的模型挨个真机试一遍（耗时 / 正文字数 / 合律程度），照着结果选：
+#   npm run probe:models                        逐家测默认模型
+#   npm run probe:models -- --provider=inferx    只测某一家
 #
-# 想先挑模型再定？填好 AI_API_KEY 后跑：npm run probe:models
-# 它会把候选模型挨个真机试一遍（耗时 / 正文字数 / JSON 是否合规），照着结果选。
+# 线上不靠脚本，直接看：GET /api/ai-status?deep=1
+# （逐家真发一条最小请求，每家约 20 token；不带 deep 只报配置、零额度、不泄露 Key）
 #
-# 不用魔搭、想接别家（DeepSeek / OpenAI / 通义）时改上面两行即可：
-#   AI_BASE_URL=https://api.deepseek.com/v1     AI_MODEL=deepseek-chat
-# 别家大多不是推理模型，那时 AI_DISABLE_THINKING 置 0 也行。
+# 各家 Key 从哪拿：
+#   商汤日日新  https://platform.sensenova.cn  → API Key（注意：它有两套入口，Key 不通用）
+#   InferX      https://model.inferx.net/catalog/endpoints
+#   魔搭         https://modelscope.cn → 右上头像 → 访问令牌（ms-xxxx）

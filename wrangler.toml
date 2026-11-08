@@ -35,16 +35,24 @@ bucket_name = "yisheng-media"
 # ── 普通变量（非密钥）────────────────────────────────────────
 # 这些可以被 wrangler 直接管理；密钥必须走 secret。
 #
-# 默认接的是**魔搭社区（ModelScope）**：https://api-inference.modelscope.cn/v1
-# 换服务商只改下面两行，不用动业务代码（shared/api-handler.js 只读这几个名字）。
+# AI 是**上游链**：2026-11-08 起支持多家并存、按序降级（shared/api-handler.js 的 AI_PROVIDERS）。
+#   商汤日日新  SENSENOVA_API_KEY   → https://token.sensenova.cn/v1          sensenova-6.8-flash-lite
+#   InferX      INFERX_API_KEY      → https://model.inferx.net/endpoints/v1  deepseek-v4.1-flash-1017-basic
+#   魔搭        AI_API_KEY          → https://api-inference.modelscope.cn/v1 Qwen/Qwen3.8-Flash-Next
+# 密钥只走 secret（或仪表盘 Variables），**不要写进本文件**。
+# 没配 Key 的那家会被自动跳过 —— 所以这里只放「非密钥」的策略项。
 #
-# ⚠️ AI_DISABLE_THINKING 必须保持 "1"：魔搭上主流模型都是推理模型，
+# ⚠️ AI_DISABLE_THINKING 必须是 "1"：这几家的主力模型多是推理模型，
 #    不关思考的话 max_tokens 会被思考段整段吃掉，正文一个字都吐不出来。
 [vars]
+AI_CHAIN = "sensenova,inferx,modelscope"
 AI_BASE_URL = "https://api-inference.modelscope.cn/v1"
 AI_MODEL = "Qwen/Qwen3.8-Flash-Next"
 AI_DISABLE_THINKING = "1"
-AI_TIMEOUT_MS = "45000"
+# 单家单次尝试的上限（还会按「还剩几家」均分，取更小的那个）
+AI_TIMEOUT_MS = "9000"
+# 整条链的总预算。CF Pages 单请求上限 30s，所以硬顶在 28s，别往上调。
+AI_TOTAL_BUDGET_MS = "27000"
 
 # 站点规范域名（非密钥，属正常配置）。
 # 作用：/sitemap.xml 与 /robots.txt 里只写这一个域名，不管请求是从哪个域名进来的。

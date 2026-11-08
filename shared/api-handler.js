@@ -711,31 +711,153 @@ const clientKey = (request) =>
 // chat_template_kwargs），这里**两个字段都发**，并且**被 400 拒绝时自动退让**
 // 成原样再发一次 —— 不能因为一个可选参数把整条 AI 通道打死。
 
-const AI_DEFAULT_TIMEOUT_MS = 45000
+/* ── 上游清单 ────────────────────────────────────────────────
+ *
+ * 2026-11-08 从「单一上游」改成「清单 + 按序降级」。起因很具体：
+ * CF 里已经加了商汤日日新、InferX 两把 Key，但代码只认 AI_API_KEY 一套，
+ * **变量设了也是死的**（页面照旧只走魔搭）。
+ *
+ * 口径与语智笔、道剑两个项目一致（那是实测出来的，别自己另发明一套）：
+ *   · 一家一份独立配额 ⇒ 一家挂了别的还在；
+ *   · 顺序由 AI_CHAIN 指定，没配就用下表顺序，**没 Key 的自动跳过**；
+ *   · 单次超时 + **整条链总预算**：CF Pages 请求上限 30s，
+ *     悬死在一家身上会让后面几家一次都轮不到（最隐蔽的那种故障）；
+ *   · 关思考的写法各家不同，按 provider 的 dialect 发，被 400/422 拒绝就退让成原样。
+ */
+const AI_DEFAULT_ATTEMPT_MS = 12000
+const AI_DEFAULT_BUDGET_MS = 27000
+const AI_HARD_BUDGET_MS = 28000
 
-function aiTimeoutMs(env) {
-  const n = Number(env.AI_TIMEOUT_MS)
-  return Number.isFinite(n) && n > 0 ? n : AI_DEFAULT_TIMEOUT_MS
+const AI_PROVIDERS = [
+  {
+    id: 'sensenova',
+    label: '商汤日日新',
+    /* 两套入口互不相通，Key 串区一律 401：platform 的 Key 走 token.*，
+     * sensecore 大装置的 Key 走 api.sensenova.cn/compatible-mode/v2。
+     * 所以这里留两个候选，401/404 时自动换下一个再试一次。 */
+    bases: ['https://token.sensenova.cn/v1', 'https://api.sensenova.cn/compatible-mode/v2'],
+    baseEnv: ['SENSENOVA_BASE', 'SENSENOVA_BASE_URL'],
+    model: 'sensenova-6.8-flash-lite',
+    modelEnv: ['SENSENOVA_MODEL', 'AI_MODEL_SENSENOVA'],
+    keyEnv: ['SENSENOVA_API_KEY', 'SENSETIME_API_KEY', 'SENSENOVA_KEY', 'SENSE_NOVA_API_KEY'],
+    noThink: 'reasoning_effort'
+  },
+  {
+    id: 'inferx',
+    label: 'InferX',
+    /* 目录页是 model.inferx.net/catalog/endpoints，接口在 /endpoints/v1；
+     * 也有项目用的是 /v1。两个都留，404 时自动换。 */
+    bases: ['https://model.inferx.net/endpoints/v1', 'https://model.inferx.net/v1'],
+    baseEnv: ['INFERX_BASE', 'INFERX_BASE_URL'],
+    model: 'deepseek-v4.1-flash-1017-basic',
+    modelEnv: ['INFERX_MODEL', 'AI_MODEL_INFERX'],
+    keyEnv: ['INFERX_API_KEY', 'INFERX_KEY'],
+    noThink: 'none'
+  },
+  {
+    id: 'modelscope',
+    label: '魔搭社区',
+    bases: ['https://api-inference.modelscope.cn/v1'],
+    baseEnv: ['AI_BASE_URL'], // 老配置沿用这一对，不动它就不会破坏现有部署
+    model: 'Qwen/Qwen3.8-Flash-Next',
+    modelEnv: ['AI_MODEL'],
+    keyEnv: ['AI_API_KEY', 'MODELSCOPE_API_KEY'],
+    noThink: 'enable_thinking'
+  }
+]
+
+/** 关思考的写法各家不统一，按 dialect 发；'none' 表示这家不用关 */
+const NO_THINK_FIELDS = {
+  enable_thinking: { enable_thinking: false, chat_template_kwargs: { enable_thinking: false } },
+  reasoning_effort: { reasoning_effort: 'none' },
+  none: {}
 }
 
-/** 单次调用上游。noThink=true 时在请求体里关掉「思考」。 */
-async function callUpstreamOnce(env, messages, { maxTokens = 1200, noThink = false } = {}) {
-  const base = (env.AI_BASE_URL || 'https://api.openai.com/v1').replace(/\/+$/, '')
-  const model = env.AI_MODEL || 'gpt-4o-mini'
+function firstEnv(env, names) {
+  for (const n of names || []) {
+    const v = env?.[n]
+    if (v && String(v).trim()) return String(v).trim()
+  }
+  return ''
+}
+
+function numEnv(env, name, def, max) {
+  const n = Number(env?.[name])
+  if (!Number.isFinite(n) || n <= 0) return def
+  return max ? Math.min(n, max) : n
+}
+
+/** 单次尝试上限（毫秒） */
+function aiTimeoutMs(env) {
+  return numEnv(env, 'AI_TIMEOUT_MS', AI_DEFAULT_ATTEMPT_MS)
+}
+
+/** 整条链的总预算（毫秒）。CF Pages 单请求上限 30s，所以硬顶在 28s。 */
+function aiBudgetMs(env) {
+  return numEnv(env, 'AI_TOTAL_BUDGET_MS', AI_DEFAULT_BUDGET_MS, AI_HARD_BUDGET_MS)
+}
+
+/**
+ * 把环境变量解析成**有序**的上游清单。
+ * only: 只保留指定的 id（逗号分隔），给模型体检 / 调试用。
+ */
+function resolveProviders(env, { only = '' } = {}) {
+  const configured = []
+  for (const p of AI_PROVIDERS) {
+    const key = firstEnv(env, p.keyEnv)
+    if (!key) continue
+    const base = (firstEnv(env, p.baseEnv) || p.bases[0]).replace(/\/+$/, '')
+    const model = firstEnv(env, p.modelEnv) || p.model
+    const bases = [base, ...p.bases.map((b) => b.replace(/\/+$/, ''))].filter((b, i, a) => a.indexOf(b) === i)
+    configured.push({ ...p, key, base, model, bases })
+  }
+  const want = String(only || '').split(',').map((s) => s.trim()).filter(Boolean)
+  if (want.length) return configured.filter((p) => want.includes(p.id))
+
+  const chain = String(env?.AI_CHAIN || '').split(',').map((s) => s.trim()).filter(Boolean)
+  if (!chain.length) return configured
+  const byId = new Map(configured.map((p) => [p.id, p]))
+  const ordered = []
+  for (const id of chain) if (byId.has(id)) ordered.push(byId.get(id))
+  /* AI_CHAIN 里没提到的也接在末尾 —— 拼错一个名字不该让某家彻底消失，
+   * 只是排到最后而已。 */
+  for (const p of configured) if (!ordered.includes(p)) ordered.push(p)
+  return ordered
+}
+
+function hasAiUpstream(env) {
+  return resolveProviders(env).length > 0
+}
+
+/**
+ * 这一家该给多少时间。
+ *
+ * 只写 `min(单次上限, 剩余预算)` 是错的：仪表盘上 AI_TIMEOUT_MS 若是 45000，
+ * 第一家就会把 27s 预算全吃光，**后面几家一次都轮不到** —— 链等于没建。
+ * 所以按「还剩几家」均分，并留 6s 下限（低于 6s 基本不可能吐出 42 字的词）。
+ */
+function attemptBudget(attemptMs, remaining, providersLeft) {
+  const share = Math.max(6000, Math.floor(remaining / Math.max(1, providersLeft)))
+  return Math.max(1200, Math.min(attemptMs, share, remaining))
+}
+
+/** 真正发一次请求（单个上游、单个入口）。noThink=true 时按 dialect 关掉「思考」。 */
+async function postChat(provider, messages, { maxTokens = 1200, noThink = false, timeoutMs, base = provider.base } = {}) {
+  const fields = noThink ? NO_THINK_FIELDS[provider.noThink] || {} : {}
   const resp = await fetch(`${base}/chat/completions`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      ...(env.AI_API_KEY ? { Authorization: `Bearer ${env.AI_API_KEY}` } : {})
+      Authorization: `Bearer ${provider.key}`
     },
     body: JSON.stringify({
-      model,
+      model: provider.model,
       messages,
       temperature: 0.85,
       max_tokens: maxTokens,
-      ...(noThink ? { enable_thinking: false, chat_template_kwargs: { enable_thinking: false } } : {})
+      ...fields
     }),
-    signal: AbortSignal.timeout(aiTimeoutMs(env))
+    signal: AbortSignal.timeout(timeoutMs || AI_DEFAULT_ATTEMPT_MS)
   })
   if (!resp.ok) {
     let hint = ''
@@ -769,27 +891,93 @@ async function callUpstreamOnce(env, messages, { maxTokens = 1200, noThink = fal
           : ''
     throw new Error(`上游未返回内容（finish_reason=${finish}${tip}）`)
   }
-  return { text, model, finish }
+  return { text, model: provider.model, finish }
 }
 
 /**
- * 关思考是「先试再退」：先带 enable_thinking 发一次，
- * 平台不认这个字段（400/422）就原样再发一次。
+ * 调一家：先按 dialect 关思考发一次，被 400/422 拒绝（平台不认这个字段）
+ * 就退让成原样再发一次；401/403/404 则换这家的下一个入口再试。
+ * 这层兜底不是可选项 —— 一个可选参数不该把整条通道打死。
  */
-async function callUpstream(env, messages, opts = {}) {
-  const wantNoThink = opts.noThink ?? env.AI_DISABLE_THINKING === '1'
-  const maxTokens = opts.maxTokens ?? 1200
+async function callProvider(provider, messages, { maxTokens, noThink, timeoutMs }) {
+  const attemptOnce = async (base) => {
+    let lastErr = null
+    /* 这家根本没有「关思考」这个开关（dialect=none）时不要白试一次 ——
+     * 白发一次就是白烧一次额度，还多等一个来回。 */
+    const variants = noThink && provider.noThink !== 'none' ? [true, false] : [false]
+    for (const nt of variants) {
+      try {
+        return await postChat(provider, messages, { maxTokens, noThink: nt, timeoutMs, base })
+      } catch (e) {
+        lastErr = e
+        /* 400/422 = 不认这个字段 → 退让；其他错误立刻往上抛 */
+        if (!(nt && (e?.status === 400 || e?.status === 422))) throw e
+      }
+    }
+    throw lastErr
+  }
+
   let lastErr = null
-  for (const noThink of wantNoThink ? [true, false] : [false]) {
+  for (let i = 0; i < provider.bases.length; i++) {
     try {
-      return await callUpstreamOnce(env, messages, { maxTokens, noThink })
+      return await attemptOnce(provider.bases[i])
     } catch (e) {
       lastErr = e
-      const rejectedField = noThink && (e?.status === 400 || e?.status === 422)
-      if (!rejectedField) throw e
+      /* 401/403/404 多半是「这套入口对不上这把 Key」（商汤两套入口 Key 不通用），
+       * 或者路径不对 —— 换下一个入口再试一次，别让配置写成两家入口的事故。 */
+      const tryNextBase =
+        (e?.status === 401 || e?.status === 403 || e?.status === 404) && i < provider.bases.length - 1
+      if (!tryNextBase) throw e
     }
   }
   throw lastErr
+}
+
+/**
+ * 按链路径调用，返回第一个成功的结果。
+ * opts.provider 可指定只走某几家（"sensenova,inferx"），体检脚本用。
+ *
+ * ⚠️ 这里必须**按剩余预算**决定单次超时：CF Pages 单请求上限 30s，
+ * 若第一家「连得上但永不出字」，把 30s 全等光就等于后面几家一次都没试过
+ * （这是带候选链的调度器最隐蔽的 bug，参数配得再好也救不回来）。
+ */
+async function callUpstream(env, messages, opts = {}) {
+  const wantNoThink = opts.noThink ?? env?.AI_DISABLE_THINKING === '1'
+  const maxTokens = opts.maxTokens ?? 1200
+  const providers = resolveProviders(env, { only: opts.provider })
+  if (!providers.length) {
+    throw new Error('没有任何可用的 AI 上游（未配置 Key：AI_API_KEY / SENSENOVA_API_KEY / INFERX_API_KEY）')
+  }
+  const deadline = Date.now() + aiBudgetMs(env)
+  const attemptMs = aiTimeoutMs(env)
+  const errors = []
+
+  for (let i = 0; i < providers.length; i++) {
+    const p = providers[i]
+    const remaining = deadline - Date.now()
+    if (remaining < 1200) {
+      errors.push(`${p.label}：总预算已用完，未尝试`)
+      break
+    }
+    try {
+      const r = await callProvider(p, messages, {
+        maxTokens,
+        noThink: wantNoThink,
+        timeoutMs: attemptBudget(attemptMs, remaining, providers.length - i)
+      })
+      return { ...r, provider: p.id, providerLabel: p.label }
+    } catch (e) {
+      errors.push(`${p.label}：${e?.message || e}`)
+      /* 只剩一家时保持原来的错误形状（status / retryable 原样带走），
+       * 免得调用方靠这两个字段判断「可不可以重试」的逻辑失效。 */
+      if (providers.length === 1) throw e
+    }
+  }
+
+  const err = new Error(`全部上游失败 → ${errors.join('｜')}`)
+  err.errors = errors
+  err.allFailed = true
+  throw err
 }
 
 function buildAiPrompt(cipai, prompt) {
@@ -848,75 +1036,110 @@ function parseAiLines(text, expected) {
 }
 
 /**
+ * 判一首 AI 词合不合格：句数、每句字数、硬平仄、韵脚是否同部、韵脚是否重复。
+ * 返回问题清单（空数组 = 合格）。
+ *
+ * 单独抽出来是因为这段判据被两处共用：线上 aiCompose 决定「要不要换下一家上游」，
+ * 体检脚本 probe-models 决定「这个模型能不能用」。抄两份必然慢慢跑偏，
+ * 最后变成「本地测着好好的、线上全回落本地引擎」。
+ */
+function judgeAiLines(cipai, arr) {
+  const bad = []
+  arr.forEach((line, i) => {
+    const spec = cipai.lines[i]
+    if (line.length !== spec.p.length) {
+      bad.push(`第${i + 1}句字数 ${line.length}≠${spec.p.length}`)
+      return
+    }
+    const chk = checkLine(spec.p, line)
+    if (chk.hard > 0) bad.push(`第${i + 1}句平仄失律×${chk.hard}`)
+  })
+  const groupChars = new Map()
+  const buByGroup = new Map()
+  cipai.lines.forEach((spec, i) => {
+    if (!spec.r) return
+    const key = String(spec.r)
+    const last = arr[i][arr[i].length - 1]
+    if (!buByGroup.has(key)) {
+      // 取该韵组第一个韵脚字的韵部
+      const tone = cipai.rhymeGroups.find((g) => String(g.key) === key)?.type || '平'
+      const cands = lookupChar(last).filter((id) => BU_BY_ID[id]?.tone === tone)
+      buByGroup.set(key, cands[0] || null)
+    }
+    const bu = buByGroup.get(key)
+    if (!bu) {
+      bad.push(`第${i + 1}句韵脚「${last}」不在预想韵部`)
+      return
+    }
+    if (!groupChars.has(key)) groupChars.set(key, new Set())
+    groupChars.get(key).add(last)
+    if (!charsOf(bu).includes(last)) bad.push(`第${i + 1}句韵脚「${last}」出韵`)
+  })
+  for (const [k, set] of groupChars) {
+    const expectCount = cipai.lines.filter((l) => String(l.r) === k).length
+    if (set.size < Math.ceil(expectCount * 0.7)) bad.push(`韵脚字重复过多（${k} 组仅 ${set.size} 个不同字）`)
+  }
+  return bad
+}
+
+/**
  * 尝试用大模型填词。
- * 返回 { ok:true, poem, model } 或 { ok:false, reason }
+ * 返回 { ok:true, lines, model, provider } 或 { ok:false, reason }
  * 任何一步不达标都退化到本地引擎 —— 宁可退，不给用户一首不合律的词。
  */
 async function aiCompose(env, { cipai, prompt }) {
-  if (!env.AI_API_KEY) return { ok: false, reason: '未配置 AI_API_KEY' }
+  const providers = resolveProviders(env)
+  if (!providers.length) {
+    return { ok: false, reason: '未配置任何 AI 上游（AI_API_KEY / SENSENOVA_API_KEY / INFERX_API_KEY 都为空）' }
+  }
   const messages = [
     { role: 'system', content: '你是精通词律的中文古典诗词专家，只输出 JSON。' },
     { role: 'user', content: buildAiPrompt(cipai, prompt) }
   ]
-  let last = null
-  for (let attempt = 0; attempt < 2; attempt++) {
-    try {
-      const { text, model } = await callUpstream(env, messages, { maxTokens: 1600 })
-      const arr = parseAiLines(text, cipai.lines.length)
-      if (!arr) {
-        last = '模型输出的句数或格式不符'
-        continue
-      }
-      // 逐句校验
-      const bad = []
-      arr.forEach((line, i) => {
-        const spec = cipai.lines[i]
-        if (line.length !== spec.p.length) {
-          bad.push(`第${i + 1}句字数 ${line.length}≠${spec.p.length}`)
-          return
-        }
-        const chk = checkLine(spec.p, line)
-        if (chk.hard > 0) bad.push(`第${i + 1}句平仄失律×${chk.hard}`)
-      })
-      // 韵脚检查
-      const groupOk = new Map()
-      const groupChars = new Map()
-      const buByGroup = new Map()
-      cipai.lines.forEach((spec, i) => {
-        if (!spec.r) return
-        const key = String(spec.r)
-        const last = arr[i][arr[i].length - 1]
-        if (!buByGroup.has(key)) {
-          // 取该韵组第一个韵脚字的韵部
-          const cands = lookupChar(last).filter((id) => BU_BY_ID[id]?.tone === (cipai.rhymeGroups.find((g) => String(g.key) === key)?.type || '平'))
-          buByGroup.set(key, cands[0] || null)
-        }
-        const bu = buByGroup.get(key)
-        if (!bu) {
-          bad.push(`第${i + 1}句韵脚「${last}」不在预想韵部`)
-          return
-        }
-        if (!groupChars.has(key)) groupChars.set(key, new Set())
-        groupChars.get(key).add(last)
-        if (!charsOf(bu).includes(last)) bad.push(`第${i + 1}句韵脚「${last}」出韵`)
-      })
-      for (const [k, set] of groupChars) {
-        const expectCount = cipai.lines.filter((l) => String(l.r) === k).length
-        if (set.size < Math.ceil(expectCount * 0.7)) bad.push(`韵脚字重复过多（${k} 组仅 ${set.size} 个不同字）`)
-      }
+  const deadline = Date.now() + aiBudgetMs(env)
+  const attemptMs = aiTimeoutMs(env)
+  // 关思考默认开启：这几家的主力模型多是推理型，不关就会把 max_tokens
+  // 整段烧在思考上、正文一个字不吐。要显式关掉才写 AI_DISABLE_THINKING=0。
+  const wantNoThink = env?.AI_DISABLE_THINKING !== '0'
+  const errors = []
 
-      if (bad.length) {
-        last = bad.slice(0, 4).join('；')
-        continue
+  for (let pi = 0; pi < providers.length; pi++) {
+    const p = providers[pi]
+    let last = null
+    /* 每家最多试 2 次：模型偶尔多吐/少吐一句，重来一次常常就好。
+     * 两次都不合律就换下一家 —— 换模型比在同一个模型上死磕有效得多。 */
+    for (let attempt = 0; attempt < 2; attempt++) {
+      const remaining = deadline - Date.now()
+      if (remaining < 1200) {
+        last = last || '总预算已用完'
+        break
       }
-      return { ok: true, lines: arr, model }
-    } catch (e) {
-      last = e?.message || String(e)
-      if (!e?.retryable) break
-      await new Promise((r) => setTimeout(r, 1500))
+      try {
+        const { text, model } = await callProvider(p, messages, {
+          maxTokens: 1600,
+          noThink: wantNoThink,
+          timeoutMs: attemptBudget(attemptMs, remaining, providers.length - pi)
+        })
+        const arr = parseAiLines(text, cipai.lines.length)
+        if (!arr) {
+          last = '模型输出的句数或格式不符'
+          continue
+        }
+        const bad = judgeAiLines(cipai, arr)
+        if (bad.length) {
+          last = bad.slice(0, 4).join('；')
+          continue
+        }
+        return { ok: true, lines: arr, model, provider: p.id, providerLabel: p.label }
+      } catch (e) {
+        last = e?.message || String(e)
+        if (!e?.retryable) break
+        await new Promise((r) => setTimeout(r, 1200))
+      }
     }
+    errors.push(`${p.label}：${last || '失败'}`)
   }
-  return { ok: false, reason: last || 'AI 通道失败' }
+  return { ok: false, reason: errors.join('｜') || 'AI 通道失败' }
 }
 
 /** 把 AI 给出的句子包装成与本地引擎一致的词作结构 */
@@ -984,6 +1207,64 @@ function wrapAiPoem(cipai, prompt, lines, model) {
 
 // ══════════════════════════════════════════ 路由
 
+/**
+ * AI 状态自检的实现（路由见 handleApi 顶部）。
+ * 密钥只报长度、不报内容 —— 这是公开接口，不能变成「Key 探测口」。
+ */
+async function aiStatusView({ url, request, env }) {
+  const deep = url.searchParams.get('deep') === '1'
+  const chain = resolveProviders(env).map((p) => ({
+    id: p.id,
+    label: p.label,
+    model: p.model,
+    base: p.base,
+    keyLen: String(p.key).length
+  }))
+  const meta = { budgetMs: aiBudgetMs(env), attemptMs: aiTimeoutMs(env) }
+  if (!deep) {
+    return ok({
+      deep: false,
+      chain,
+      ...meta,
+      hint: chain.length ? '加 ?deep=1 可逐个真发一条最小请求' : '一个 Key 都没配（AI_API_KEY / SENSENOVA_API_KEY / INFERX_API_KEY）'
+    })
+  }
+  if (!(await rateLimit(env, `aistatus:${clientKey(request)}`, 6, 60))) {
+    return fail(429, '自检请求过于频繁，请一分钟后再试')
+  }
+  const results = []
+  for (const p of resolveProviders(env)) {
+    const t0 = Date.now()
+    try {
+      const r = await callProvider(p, [{ role: 'user', content: '只回复两个字：收到' }], {
+        maxTokens: 24,
+        noThink: true,
+        timeoutMs: Math.min(aiTimeoutMs(env), 15000)
+      })
+      results.push({
+        id: p.id,
+        label: p.label,
+        model: p.model,
+        base: p.base,
+        ok: true,
+        ms: Date.now() - t0,
+        reply: String(r.text).slice(0, 40)
+      })
+    } catch (e) {
+      results.push({
+        id: p.id,
+        label: p.label,
+        model: p.model,
+        base: p.base,
+        ok: false,
+        ms: Date.now() - t0,
+        error: e?.message || String(e)
+      })
+    }
+  }
+  return ok({ deep: true, chain, ...meta, results })
+}
+
 export async function handleApi({ request, env }) {
   const url = new URL(request.url)
   const path = url.pathname.replace(/^\/api(?=\/|$)/, '') || '/'
@@ -995,6 +1276,8 @@ export async function handleApi({ request, env }) {
 
   try {
     if (path === '/health') return ok({ status: 'up', time: new Date().toISOString() })
+    // 自检接口不碰数据库，也不该因为数据库挂了就打不开
+    if (path === '/ai-status' && method === 'GET') return aiStatusView({ url, request, env })
     await ensureSchema(env)
     const res = await route(path, method, { url, request, env })
     if (res) return res
@@ -1061,7 +1344,7 @@ async function route(path, method, ctx) {
 
     let poem = null
     let engineNote = ''
-    if (env.AI_API_KEY) {
+    if (hasAiUpstream(env)) {
       const ai = await aiCompose(env, { cipai, prompt })
       if (ai.ok) {
         poem = wrapAiPoem(cipai, prompt, ai.lines, ai.model)
@@ -2651,4 +2934,6 @@ function normalizeDateTime(v) {
 export { isGeneratable, getCipai, CIPAI }
 // 供 `scripts/probe-models.mjs`（模型体检）复用 —— 让它测的就是线上真正发的那份请求，
 // 而不是脚本里另抄一份 prompt（抄一份必然慢慢跑偏）。
-export { buildAiPrompt, callUpstream, parseAiLines }
+export { buildAiPrompt, callUpstream, parseAiLines, judgeAiLines }
+// 多上游清单：体检脚本、/api/ai-status、测试都从这里取，保证「测的=跑的」
+export { AI_PROVIDERS, resolveProviders, hasAiUpstream, aiBudgetMs, aiTimeoutMs }
